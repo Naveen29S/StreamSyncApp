@@ -26,8 +26,11 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# OS / system files
 .DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
 *.pem
 
 # local env files
@@ -46,3 +49,5 @@ yarn-error.*
 # supabase
 supabase/.temp/
 supabase/.branches/
+supabase/snippets/
+
