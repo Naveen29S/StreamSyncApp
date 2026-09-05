@@ -58,18 +58,7 @@ export default function AuthScreen() {
         Alert.alert('Sign Up Error', 'This email is linked to an existing account.');
       } else {
         if (data?.session) {
-          // Check if user needs to connect platforms
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('connected_platforms')
-            .eq('id', data.session.user.id)
-            .maybeSingle();
-            
-          if (!profile?.connected_platforms || profile.connected_platforms.length === 0) {
-            router.replace('/dashboard/platforms');
-          } else {
-            router.replace('/dashboard');
-          }
+          router.replace('/dashboard');
         } else {
           Alert.alert('Success', 'Account created! Please check your email to verify your account.');
           setPassword('');
@@ -85,18 +74,7 @@ export default function AuthScreen() {
       if (error) {
         Alert.alert('Sign In Error', error.message);
       } else if (data?.session) {
-        // Check if user needs to connect platforms
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('connected_platforms')
-          .eq('id', data.session.user.id)
-          .maybeSingle();
-          
-        if (!profile?.connected_platforms || profile.connected_platforms.length === 0) {
-          router.replace('/dashboard/platforms');
-        } else {
-          router.replace('/dashboard');
-        }
+        router.replace('/dashboard');
       }
     }
     setLoading(false);

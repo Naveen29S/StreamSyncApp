@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated, Modal, TextInput, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { connectYouTubeViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
@@ -58,6 +58,7 @@ export default function ConnectsScreen() {
   const [apiKeys, setApiKeys] = useState({});
   const [syncing, setSyncing] = useState(null);
   const [connectError, setConnectError] = useState(null);
+  const [managePlatform, setManagePlatform] = useState(null);
   const params = useLocalSearchParams();
 
   // YouTube modal states
@@ -86,8 +87,24 @@ export default function ConnectsScreen() {
       router.setParams({ error: '', error_code: '', error_description: '' });
     }
 
-    if (params?.connect === 'yt') {
-      openYtModal();
+    if (params?.connect) {
+      if (params.connect === 'yt') {
+        openYtModal();
+      } else {
+        const plat = platforms.find(p => p.id === params.connect);
+        if (plat) {
+          const isConn = connectedPlatforms.some(p => isPlatformMatch(p, plat.id));
+          if (isConn) {
+            setManagePlatform(plat);
+          } else {
+            handleOAuthConnect(plat.id);
+          }
+        }
+      }
+      if (Platform.OS === 'web') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      router.setParams({ connect: '' });
     }
   }, [params?.error, params?.connect]);
 
@@ -113,7 +130,8 @@ export default function ConnectsScreen() {
         let profileUpdated = false;
         
         const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-        const identities = session.user?.identities || [];
+        const { data: { user } } = await supabase.auth.getUser();
+        const identities = user?.identities || session.user?.identities || [];
         
         identities.forEach(id => {
            const platformId = providerToPlatformMap[id.provider];
@@ -245,6 +263,30 @@ export default function ConnectsScreen() {
     }
   }
 
+  async function handleDisconnectPlatform(platformId) {
+    if (!session) return;
+    try {
+      await disconnectPlatform(platformId);
+      await fetchProfile(session.user.id);
+      setManagePlatform(null);
+    } catch (e) {
+      alert('Failed to disconnect: ' + (e.message || 'Unknown error'));
+    }
+  }
+
+  async function handleSyncPlatform(platformId) {
+    if (!session) return;
+    try {
+      setSyncing(platformId);
+      await syncPlatformData([platformId]);
+      await fetchProfile(session.user.id);
+      setTimeout(() => setSyncing(null), 1000);
+    } catch (e) {
+      setSyncing(null);
+      alert('Failed to sync: ' + (e.message || 'Unknown error'));
+    }
+  }
+
   async function handleOAuthConnect(platformId) {
     if (!session) return;
     setSyncing(platformId);
@@ -273,22 +315,30 @@ export default function ConnectsScreen() {
 
     if (provider) {
       await AsyncStorage.setItem('pending_connection', platformId);
-      const { data, error } = await supabase.auth.linkIdentity({
+      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformId));
+      const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
+
+      const { data, error } = await authMethod.call(supabase.auth, {
         provider: provider,
         options: {
           scopes: scopes ? scopes : undefined,
-          redirectTo: Platform.OS === 'web' ? window.location.origin + '/dashboard/platforms' : undefined
+          redirectTo: Platform.OS === 'web' ? (window.location.origin + (typeof window !== 'undefined' ? window.location.pathname : '/dashboard/platforms')) : undefined
         }
       });
       if (error) {
         console.warn('OAuth Error:', error.message);
         setConnectError(error.message);
-        setSyncing(platformId + '_error');
+        setSyncing(null);
         if (platformId === 'yt') {
           setYtModalError(error.message);
         }
-      } else if (data?.url && Platform.OS === 'web') {
-        window.location.href = data.url;
+      } else if (data?.url) {
+        if (Platform.OS === 'web') {
+          window.location.href = data.url;
+        } else {
+          Linking.openURL(data.url);
+          setSyncing(null);
+        }
       }
     } else {
       setSyncing(null);
@@ -365,7 +415,7 @@ export default function ConnectsScreen() {
                     </View>
                     <TouchableOpacity 
                       style={styles.chevronButton} 
-                      onPress={() => platform.id === 'yt' ? openYtModal() : handleConnectPress(platform.id)}
+                      onPress={() => platform.id === 'yt' ? openYtModal() : setManagePlatform(platform)}
                     >
                       <Text style={styles.chevronIcon}>✎</Text>
                     </TouchableOpacity>
@@ -556,6 +606,70 @@ export default function ConnectsScreen() {
               </View>
             )}
 
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Platform Management Modal (for non-YT platforms) ─── */}
+      <Modal
+        visible={Boolean(managePlatform)}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setManagePlatform(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {managePlatform && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Image source={{ uri: managePlatform.logo }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+                    <Text style={styles.modalTitle}>Manage {managePlatform.name}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setManagePlatform(null)} style={styles.modalCloseBtn}>
+                    <Text style={{ fontSize: 18, color: '#666' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.alreadyConnectedBox}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Account Connected & Active</Text>
+                  </View>
+                  <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                    Your {managePlatform.name} account is linked to your StreamSync profile.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <TouchableOpacity 
+                      style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                      onPress={() => handleSyncPlatform(managePlatform.id)}
+                      disabled={syncing === managePlatform.id}
+                    >
+                      <Text style={styles.modalSecondaryBtnText}>
+                        {syncing === managePlatform.id ? 'Syncing...' : '↻ Sync Now'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.modalDangerBtn, { flex: 1 }]} 
+                      onPress={() => handleDisconnectPlatform(managePlatform.id)}
+                    >
+                      <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.quickSampleBtn, { marginTop: 8 }]}
+                  onPress={() => {
+                    const pid = managePlatform.id;
+                    setManagePlatform(null);
+                    handleOAuthConnect(pid);
+                  }}
+                >
+                  <Text style={styles.quickSampleText}>↻ Re-authenticate / Reconnect Account</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>

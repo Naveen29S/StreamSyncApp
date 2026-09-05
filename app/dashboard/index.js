@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity }
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { fetchPlatformData, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORMS = {
   YouTube:    { color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
@@ -20,6 +20,10 @@ export default function DashboardIndex() {
   const [activeTab, setActiveTab] = useState('all');
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const params = useLocalSearchParams();
+
+  // In-place Platform Connect & Management Modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState('YouTube');
 
   // Handle OAuth redirect errors if they return directly to the dashboard
   useEffect(() => {
@@ -38,117 +42,94 @@ export default function DashboardIndex() {
     }
   }, [params?.error]);
 
-  async function handleConnectPress(platformName) {
-    if (platformName === 'YouTube') {
-      router.push('/dashboard/platforms?connect=yt');
-      return;
-    }
-
-    let provider = '';
-    let scopes = '';
-    let queryParams = undefined;
-    const dbKeyMap = { 'YouTube': 'yt', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
-    
-    switch (platformName) {
-      case 'Facebook':
-      case 'Instagram':
-        provider = 'facebook';
-        scopes = 'public_profile';
-        break;
-      case 'X (Twitter)':
-      case 'X':
-        provider = 'twitter';
-        break;
-      case 'LinkedIn':
-        provider = 'linkedin_oidc';
-        break;
-    }
-
-    if (provider) {
-      await AsyncStorage.setItem('pending_connection', dbKeyMap[platformName] || '');
-      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, dbKeyMap[platformName]));
-      const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
-      
-      const { data, error } = await authMethod.call(supabase.auth, {
-        provider: provider,
-        options: {
-          scopes: scopes ? scopes : undefined,
-          redirectTo: Platform.OS === 'web' ? window.location.origin + '/dashboard' : undefined,
-          queryParams: queryParams
-        }
-      });
-      
-      if (error) {
-        console.warn('OAuth Error:', error.message);
-      } else if (data?.url && Platform.OS === 'web') {
-        window.location.href = data.url;
+  useEffect(() => {
+    if (params?.connect) {
+      const pMap = { yt: 'YouTube', youtube: 'YouTube', ig: 'Instagram', instagram: 'Instagram', x: 'X (Twitter)', twitter: 'X (Twitter)', fb: 'Facebook', facebook: 'Facebook', in: 'LinkedIn', linkedin: 'LinkedIn' };
+      const plat = pMap[String(params.connect).toLowerCase()] || 'YouTube';
+      openConnectModal(plat);
+      if (Platform.OS === 'web') {
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
+      router.setParams({ connect: '' });
     }
+  }, [params?.connect]);
+
+  function openConnectModal(platformName = 'YouTube') {
+    setSelectedPlatform(platformName);
+    setModalVisible(true);
   }
+
+  const reloadDashboardData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return [];
+
+    if (session.provider_token) {
+      await processSessionOAuthTokens(session);
+    }
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('connected_platforms')
+      .eq('id', session.user.id)
+      .maybeSingle();
+      
+    const { data: { user } } = await supabase.auth.getUser();
+    const identities = user?.identities || session.user?.identities || [];
+    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
+    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+    // Also check if analytics has any connected platforms recorded
+    const { data: anRows } = await supabase
+      .from('analytics')
+      .select('platform')
+      .eq('user_id', session.user.id);
+    const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
+
+    // Combine profile platforms, identity platforms, and analytics records
+    const platforms = Array.from(new Set([
+      ...(profile?.connected_platforms || []),
+      ...identityPlatforms,
+      ...anPlatforms
+    ]));
+    
+    setConnectedPlatforms(platforms);
+    
+    // 1. Fetch current cached DB data immediately so UI isn't blocked
+    const apiData = await fetchPlatformData(platforms);
+    setData(apiData);
+    setLoading(false);
+    return platforms;
+  };
 
   useEffect(() => {
     let subscription = null;
 
-    const loadData = async () => {
+    const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      if (session.provider_token) {
-        await processSessionOAuthTokens(session);
-      }
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('connected_platforms')
-        .eq('id', session.user.id)
-        .maybeSingle();
-        
-      const { data: { user } } = await supabase.auth.getUser();
-      const identities = user?.identities || session.user?.identities || [];
-      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+      const platforms = await reloadDashboardData();
 
-      // Also check if analytics has any connected platforms recorded
-      const { data: anRows } = await supabase
-        .from('analytics')
-        .select('platform')
-        .eq('user_id', session.user.id);
-      const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
-
-      // Combine profile platforms, identity platforms, and analytics records
-      const platforms = Array.from(new Set([
-        ...(profile?.connected_platforms || []),
-        ...identityPlatforms,
-        ...anPlatforms
-      ]));
-      
-      setConnectedPlatforms(platforms);
-      
-      // 1. Fetch current cached DB data immediately so UI isn't blocked
-      const apiData = await fetchPlatformData(platforms);
-      setData(apiData);
-      setLoading(false);
-      
       // 2. Trigger background sync via Edge Function & direct API
-      if (platforms.length > 0) {
+      if (platforms && platforms.length > 0) {
         syncPlatformData(platforms);
       }
 
       // 3. Realtime updates listener
       subscription = supabase.channel('dashboard-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
-          fetchPlatformData(platforms).then(setData);
+          reloadDashboardData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-          fetchPlatformData(platforms).then(setData);
+          reloadDashboardData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-          fetchPlatformData(platforms).then(setData);
+          reloadDashboardData();
         })
         .subscribe();
     };
     
-    loadData();
+    init();
 
     return () => {
       if (subscription) {
@@ -170,7 +151,8 @@ export default function DashboardIndex() {
   }
 
   return (
-    <ScrollView style={styles.scroller} contentContainerStyle={styles.scrollContent}>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <ScrollView style={styles.scroller} contentContainerStyle={styles.scrollContent}>
       
       {/* ─── Page Header ─── */}
       <View style={styles.pageHeader}>
@@ -179,7 +161,7 @@ export default function DashboardIndex() {
           <Text style={styles.pageTitle}>Your Creator Dashboard</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/dashboard/platforms?connect=yt')}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => openConnectModal('YouTube')}>
             <Text style={styles.headerBtnText}>+ Connect Channel</Text>
           </TouchableOpacity>
         </View>
@@ -189,7 +171,7 @@ export default function DashboardIndex() {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingHorizontal: 30 }}>
         <Text style={{ fontSize: 13, color: '#666', marginRight: 12, fontWeight: '600' }}>Active Connections:</Text>
         {connectedPlatforms.length === 0 ? (
-          <TouchableOpacity onPress={() => router.push('/dashboard/platforms?connect=yt')}>
+          <TouchableOpacity onPress={() => openConnectModal('YouTube')}>
             <Text style={{ fontSize: 13, color: '#ff6b6b', fontWeight: '500' }}>None. Click to connect YouTube.</Text>
           </TouchableOpacity>
         ) : (
@@ -307,7 +289,7 @@ export default function DashboardIndex() {
                 
                 {isConnected && (
                   <TouchableOpacity 
-                    onPress={() => handleConnectPress(name)} 
+                    onPress={() => openConnectModal(name)} 
                     style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#f5f5f5', borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}
                   >
                     <Text style={{ fontSize: 12, color: '#555', fontWeight: '600' }}>Manage</Text>
@@ -340,7 +322,7 @@ export default function DashboardIndex() {
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.connectPlatformBtn} onPress={() => handleConnectPress(name)}>
+                <TouchableOpacity style={styles.connectPlatformBtn} onPress={() => openConnectModal(name)}>
                   <Text style={styles.connectPlatformText}>Connect {name} →</Text>
                 </TouchableOpacity>
               )}
@@ -479,7 +461,7 @@ export default function DashboardIndex() {
             <Text style={styles.qaArrow}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickAction} onPress={() => handleConnectPress('YouTube')}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => openConnectModal('YouTube')}>
             <View style={[styles.qaIcon, { backgroundColor: 'rgba(10,102,194,0.08)' }]}>
               <Text style={styles.qaIconText}>🔗</Text>
             </View>
@@ -493,6 +475,16 @@ export default function DashboardIndex() {
       </View>
 
     </ScrollView>
+
+    {/* ─── In-Place Platform Connect & Management Modal ─── */}
+    <ConnectModal
+      visible={modalVisible}
+      onClose={() => setModalVisible(false)}
+      initialPlatform={selectedPlatform}
+      onSuccess={reloadDashboardData}
+    />
+
+  </View>
   );
 }
 

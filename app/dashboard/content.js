@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Platform, 
 import { supabase } from '../../lib/supabase';
 import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
+import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -30,6 +31,7 @@ export default function ContentScreen() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
   const filters = ['All', 'YouTube', 'Video', 'Image', 'Text'];
 
   const loadContent = async () => {
@@ -129,7 +131,7 @@ export default function ContentScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.createBtn}
-            onPress={() => router.push('/dashboard/platforms?connect=yt')}
+            onPress={() => setConnectModalVisible(true)}
           >
             <Text style={styles.createBtnIcon}>+</Text>
             <Text style={styles.createBtnText}>Connect Channel</Text>
@@ -161,11 +163,11 @@ export default function ContentScreen() {
             {activeFilter === 'All' ? 'No Synced Videos or Posts' : `No ${activeFilter} Content`}
           </Text>
           <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', maxWidth: 360, marginBottom: 24, lineHeight: 22 }}>
-            Connect your YouTube channel in Platforms to automatically sync your latest uploads, views, and engagement metrics.
+            Connect your YouTube channel to automatically sync your latest uploads, views, and engagement metrics.
           </Text>
           <TouchableOpacity 
             style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
-            onPress={() => router.push('/dashboard/platforms?connect=yt')}
+            onPress={() => setConnectModalVisible(true)}
           >
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
           </TouchableOpacity>
@@ -208,6 +210,16 @@ export default function ContentScreen() {
           ))}
         </ScrollView>
       )}
+
+      <ConnectModal
+        visible={connectModalVisible}
+        onClose={() => setConnectModalVisible(false)}
+        initialPlatform="YouTube"
+        onSuccess={async () => {
+          await handleSyncContent();
+          await loadContent();
+        }}
+      />
     </View>
   );
 }

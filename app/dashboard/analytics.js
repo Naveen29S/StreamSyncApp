@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchPlatformData, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import ConnectModal from '../../components/ConnectModal';
 
 function formatCompactNumber(num) {
   if (num === null || num === undefined || isNaN(num)) return '0';
@@ -24,52 +25,55 @@ export default function AnalyticsScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
   const router = useRouter();
-  
+
+  const loadData = async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    
+    const { data: profile } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
+    const { data: { user } } = await supabase.auth.getUser();
+    const identities = user?.identities || session.user?.identities || [];
+    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
+    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+    // Also query analytics rows directly
+    const { data: anRows } = await supabase.from('analytics').select('platform').eq('user_id', session.user.id);
+    const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
+
+    const platforms = Array.from(new Set([...(profile?.connected_platforms || []), ...identityPlatforms, ...anPlatforms]));
+    setConnectedPlatforms(platforms);
+    
+    const platformData = await fetchPlatformData(platforms);
+    setData(platformData);
+    setLoading(false);
+
+    if (platforms.length > 0) {
+      syncPlatformData(platforms);
+    }
+  };
+
   useEffect(() => {
     let subscription = null;
 
-    async function loadData() {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+    loadData();
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
-      
-      const { data: profile } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
-      const { data: { user } } = await supabase.auth.getUser();
-      const identities = user?.identities || session.user?.identities || [];
-      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
-
-      // Also query analytics rows directly
-      const { data: anRows } = await supabase.from('analytics').select('platform').eq('user_id', session.user.id);
-      const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
-
-      const platforms = Array.from(new Set([...(profile?.connected_platforms || []), ...identityPlatforms, ...anPlatforms]));
-      setConnectedPlatforms(platforms);
-      
-      const platformData = await fetchPlatformData(platforms);
-      setData(platformData);
-      setLoading(false);
-
-      if (platforms.length > 0) {
-        syncPlatformData(platforms);
-      }
-
-      // Subscribe to real-time changes
       subscription = supabase.channel('schema-db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
-           fetchPlatformData(platforms).then(setData);
+          loadData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-           fetchPlatformData(platforms).then(setData);
+          loadData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-           fetchPlatformData(platforms).then(setData);
+          loadData();
         })
         .subscribe();
-    }
-    
-    loadData();
+    });
 
     return () => {
       if (subscription) {
@@ -105,10 +109,16 @@ export default function AnalyticsScreen() {
         </Text>
         <TouchableOpacity 
           style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
-          onPress={() => router.push('/dashboard/platforms')}
+          onPress={() => setConnectModalVisible(true)}
         >
           <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Connect Platforms →</Text>
         </TouchableOpacity>
+
+        <ConnectModal
+          visible={connectModalVisible}
+          onClose={() => setConnectModalVisible(false)}
+          onSuccess={loadData}
+        />
       </View>
     );
   }
@@ -130,16 +140,24 @@ export default function AnalyticsScreen() {
           <Text style={styles.pageTitle}>Analytics</Text>
           <Text style={styles.pageSubtitle}>Deep dive into your performance metrics</Text>
         </View>
-        <View style={styles.timeframeToggle}>
-          {['7D', '30D', '90D', 'YTD'].map(t => (
-            <TouchableOpacity 
-              key={t} 
-              style={[styles.timeBtn, timeframe === t && styles.timeBtnActive]}
-              onPress={() => setTimeframe(t)}
-            >
-              <Text style={[styles.timeBtnText, timeframe === t && styles.timeBtnTextActive]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={styles.timeframeToggle}>
+            {['7D', '30D', '90D', 'YTD'].map(t => (
+              <TouchableOpacity 
+                key={t} 
+                style={[styles.timeBtn, timeframe === t && styles.timeBtnActive]}
+                onPress={() => setTimeframe(t)}
+              >
+                <Text style={[styles.timeBtnText, timeframe === t && styles.timeBtnTextActive]}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity 
+            style={{ backgroundColor: '#000', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+            onPress={() => setConnectModalVisible(true)}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>+ Connect</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -309,6 +327,11 @@ export default function AnalyticsScreen() {
 
       </View>
 
+      <ConnectModal
+        visible={connectModalVisible}
+        onClose={() => setConnectModalVisible(false)}
+        onSuccess={loadData}
+      />
     </ScrollView>
   );
 }

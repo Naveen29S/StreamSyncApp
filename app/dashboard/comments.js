@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Platfo
 import { supabase } from '../../lib/supabase';
 import { normalizePlatformName, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
+import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -32,6 +33,7 @@ export default function CommentsScreen() {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
   const [replyText, setReplyText] = useState('');
@@ -177,11 +179,11 @@ export default function CommentsScreen() {
               <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#000', marginBottom: 4 }}>No Comments Found</Text>
               <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
-                Connect your YouTube channel in Platforms to view audience comments.
+                Connect your YouTube channel to view audience comments.
               </Text>
               <TouchableOpacity 
                 style={styles.connectLinkBtn}
-                onPress={() => router.push('/dashboard/platforms?connect=yt')}
+                onPress={() => setConnectModalVisible(true)}
               >
                 <Text style={styles.connectLinkText}>Connect YouTube →</Text>
               </TouchableOpacity>
@@ -288,6 +290,16 @@ export default function CommentsScreen() {
           )}
         </View>
       </View>
+
+      <ConnectModal
+        visible={connectModalVisible}
+        onClose={() => setConnectModalVisible(false)}
+        initialPlatform="YouTube"
+        onSuccess={async () => {
+          await handleSyncComments();
+          await loadComments();
+        }}
+      />
     </View>
   );
 }
