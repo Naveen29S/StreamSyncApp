@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { connectYouTubeViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
@@ -14,7 +15,7 @@ const platforms = [
     logo: 'https://img.icons8.com/color/512/youtube-play.png',
     logoBg: '#fff',
     logoSize: { width: 34, height: 34 },
-    description: 'Sync video analytics & comments'
+    description: 'Sync video analytics, subscriber count & comments via API or Google'
   },
   { 
     id: 'ig', 
@@ -44,7 +45,7 @@ const platforms = [
     id: 'in', 
     name: 'LinkedIn', 
     logo: 'https://img.icons8.com/color/512/linkedin.png', 
-    logoBg: '#fff',
+    logoBg: '#fff', 
     logoSize: { width: 34, height: 34 },
     description: 'Connect your LinkedIn profile or page' 
   },
@@ -58,6 +59,15 @@ export default function ConnectsScreen() {
   const [syncing, setSyncing] = useState(null);
   const [connectError, setConnectError] = useState(null);
   const params = useLocalSearchParams();
+
+  // YouTube modal states
+  const [ytModalVisible, setYtModalVisible] = useState(false);
+  const [ytTab, setYtTab] = useState('apikey'); // 'apikey' | 'oauth'
+  const [ytApiKey, setYtApiKey] = useState('');
+  const [ytChannelId, setYtChannelId] = useState('');
+  const [ytLoading, setYtLoading] = useState(false);
+  const [ytModalError, setYtModalError] = useState('');
+  const [ytModalSuccess, setYtModalSuccess] = useState('');
 
   // Handle OAuth redirect errors
   useEffect(() => {
@@ -75,12 +85,21 @@ export default function ConnectsScreen() {
       }
       router.setParams({ error: '', error_code: '', error_description: '' });
     }
-  }, [params?.error]);
+
+    if (params?.connect === 'yt') {
+      openYtModal();
+    }
+  }, [params?.error, params?.connect]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
+      if (session) {
+        fetchProfile(session.user.id);
+        if (session.provider_token) {
+          processSessionOAuthTokens(session);
+        }
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -88,8 +107,8 @@ export default function ConnectsScreen() {
       if (session) {
         await fetchProfile(session.user.id);
         
-        // 1. Sync connected_platforms based strictly on Supabase identities (most reliable for linkIdentity)
-        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).single();
+        // 1. Sync connected_platforms based on identities
+        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).maybeSingle();
         let newConnected = profile?.connected_platforms || [];
         let profileUpdated = false;
         
@@ -98,7 +117,6 @@ export default function ConnectsScreen() {
         
         identities.forEach(id => {
            const platformId = providerToPlatformMap[id.provider];
-           // If they have the identity linked in Supabase but it's not in their profile yet, add it!
            if (platformId && !newConnected.includes(platformId)) {
                newConnected.push(platformId);
                profileUpdated = true;
@@ -106,32 +124,14 @@ export default function ConnectsScreen() {
         });
         
         if (profileUpdated) {
-           await supabase.from('profiles').update({ connected_platforms: newConnected }).eq('id', session.user.id);
+           await supabase.from('profiles').upsert({ id: session.user.id, connected_platforms: newConnected }, { onConflict: 'id' });
            setConnectedPlatforms(newConnected);
         }
 
-        // 2. Handle provider token capture if available (for future Edge function API calls)
+        // 2. Handle provider token capture if available
         if (session.provider_token) {
-          const pendingPlatform = await AsyncStorage.getItem('pending_connection');
-          let platformId = pendingPlatform;
-          
-          if (!platformId) {
-            const provider = session.user?.app_metadata?.provider;
-            const platformMap = { google: 'yt', facebook: 'fb', twitter: 'x', linkedin_oidc: 'in' };
-            platformId = platformMap[provider];
-          }
-
-          if (platformId) {
-             await AsyncStorage.removeItem('pending_connection');
-             const newApiKeys = { ...(profile?.api_keys || {}) };
-             newApiKeys[platformId] = session.provider_token;
-             
-             await supabase.from('profiles').update({
-               api_keys: newApiKeys
-             }).eq('id', session.user.id);
-             
-             setApiKeys(newApiKeys);
-          }
+          await processSessionOAuthTokens(session);
+          await fetchProfile(session.user.id);
         }
       } else {
         router.replace('/auth');
@@ -146,18 +146,109 @@ export default function ConnectsScreen() {
       .from('profiles')
       .select('connected_platforms, api_keys')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+
     if (data?.connected_platforms) {
       setConnectedPlatforms(data.connected_platforms);
     }
     if (data?.api_keys) {
       setApiKeys(data.api_keys);
+      const rawKey = typeof data.api_keys.youtube === 'object'
+        ? (data.api_keys.youtube.apiKey || data.api_keys.youtube.token || '')
+        : (data.api_keys.youtube || data.api_keys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
+      const rawChan = data.api_keys.youtube_channel_id || data.api_keys.yt_channel_id || (typeof data.api_keys.youtube === 'object' ? data.api_keys.youtube.channelId : '') || '';
+      if (rawKey) setYtApiKey(rawKey);
+      if (rawChan) setYtChannelId(rawChan);
     }
   }
 
-  async function handleConnectPress(platformId) {
+  function openYtModal() {
+    setYtModalError('');
+    setYtModalSuccess('');
+    const rawKey = typeof apiKeys.youtube === 'object'
+      ? (apiKeys.youtube.apiKey || apiKeys.youtube.token || '')
+      : (apiKeys.youtube || apiKeys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
+    const rawChan = apiKeys.youtube_channel_id || apiKeys.yt_channel_id || (typeof apiKeys.youtube === 'object' ? apiKeys.youtube.channelId : '') || '';
+
+    setYtApiKey(rawKey);
+    setYtChannelId(rawChan || '@GoogleDevelopers');
+    setYtModalVisible(true);
+  }
+
+  async function handleApiKeyConnect(customKey, customChannel) {
+    const keyToUse = (customKey !== undefined ? customKey : ytApiKey).trim();
+    const chanToUse = (customChannel !== undefined ? customChannel : ytChannelId).trim();
+
+    if (!keyToUse) {
+      setYtModalError('Please enter a YouTube Data API Key (or click "Quick Demo Channel" below to test).');
+      return;
+    }
+    if (!chanToUse) {
+      setYtModalError('Please enter a YouTube Channel Handle (e.g. @mkbhd, @GoogleDevelopers) or Channel ID (e.g. UC...).');
+      return;
+    }
+
+    setYtLoading(true);
+    setYtModalError('');
+    setYtModalSuccess('');
+
+    try {
+      const channelData = await connectYouTubeViaApiKey(keyToUse, chanToUse);
+      setYtModalSuccess(`Successfully connected to: ${channelData.channel.title}!`);
+      
+      // Update local state
+      await fetchProfile(session.user.id);
+      
+      setTimeout(() => {
+        setYtModalVisible(false);
+        setYtModalSuccess('');
+      }, 1200);
+    } catch (err) {
+      setYtModalError(err.message || 'Failed to connect YouTube channel. Please check your key and channel details.');
+    } finally {
+      setYtLoading(false);
+    }
+  }
+
+  async function handleQuickDemoConnect() {
+    setYtApiKey('DEMO');
+    setYtChannelId('@GoogleDevelopers');
+    await handleApiKeyConnect('DEMO', '@GoogleDevelopers');
+  }
+
+  async function handleSyncYtNow() {
+    setYtLoading(true);
+    setYtModalError('');
+    try {
+      await syncPlatformData(['yt']);
+      setYtModalSuccess('Channel data refreshed successfully!');
+      setTimeout(() => setYtModalSuccess(''), 2000);
+    } catch (e) {
+      setYtModalError(e.message || 'Sync failed');
+    } finally {
+      setYtLoading(false);
+    }
+  }
+
+  async function handleDisconnectYt() {
+    setYtLoading(true);
+    try {
+      await disconnectPlatform('yt');
+      await fetchProfile(session.user.id);
+      setYtApiKey('');
+      setYtChannelId('');
+      setYtModalVisible(false);
+    } catch (e) {
+      setYtModalError(e.message || 'Failed to disconnect');
+    } finally {
+      setYtLoading(false);
+    }
+  }
+
+  async function handleOAuthConnect(platformId) {
     if (!session) return;
     setSyncing(platformId);
+    setConnectError(null);
     
     let provider = '';
     let scopes = '';
@@ -193,6 +284,9 @@ export default function ConnectsScreen() {
         console.warn('OAuth Error:', error.message);
         setConnectError(error.message);
         setSyncing(platformId + '_error');
+        if (platformId === 'yt') {
+          setYtModalError(error.message);
+        }
       } else if (data?.url && Platform.OS === 'web') {
         window.location.href = data.url;
       }
@@ -200,6 +294,16 @@ export default function ConnectsScreen() {
       setSyncing(null);
     }
   }
+
+  function handleConnectPress(platformId) {
+    if (platformId === 'yt') {
+      openYtModal();
+      return;
+    }
+    handleOAuthConnect(platformId);
+  }
+
+  const isYtConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'yt'));
 
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -240,7 +344,7 @@ export default function ConnectsScreen() {
         {/* Platforms List */}
         <View style={styles.listContainer}>
           {platforms.map((platform, index) => {
-            const isConnected = connectedPlatforms.includes(platform.id);
+            const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, platform.id));
             
             return (
               <View key={platform.id} style={[styles.card, isConnected && styles.cardConnected]}>
@@ -259,7 +363,10 @@ export default function ConnectsScreen() {
                     <View style={styles.connectedBadge}>
                       <Text style={styles.connectedBadgeText}>Connected</Text>
                     </View>
-                    <TouchableOpacity style={styles.chevronButton} onPress={() => handleConnectPress(platform.id)}>
+                    <TouchableOpacity 
+                      style={styles.chevronButton} 
+                      onPress={() => platform.id === 'yt' ? openYtModal() : handleConnectPress(platform.id)}
+                    >
                       <Text style={styles.chevronIcon}>✎</Text>
                     </TouchableOpacity>
                   </View>
@@ -292,6 +399,166 @@ export default function ConnectsScreen() {
         </View>
           
       </Animated.ScrollView>
+
+      {/* ─── YouTube Connection Modal ─── */}
+      <Modal
+        visible={ytModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setYtModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Image source={{ uri: 'https://img.icons8.com/color/512/youtube-play.png' }} style={{ width: 28, height: 28 }} resizeMode="contain" />
+                <Text style={styles.modalTitle}>Connect YouTube</Text>
+              </View>
+              <TouchableOpacity onPress={() => setYtModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={{ fontSize: 18, color: '#666' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {isYtConnected && (
+              <View style={styles.alreadyConnectedBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Channel Connected & Synced</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                  {apiKeys.youtube_channel_title ? `Channel: ${apiKeys.youtube_channel_title}` : 'Your YouTube channel is actively delivering data.'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <TouchableOpacity 
+                    style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                    onPress={handleSyncYtNow}
+                    disabled={ytLoading}
+                  >
+                    <Text style={styles.modalSecondaryBtnText}>{ytLoading ? 'Syncing...' : '↻ Sync Now'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalDangerBtn, { flex: 1 }]} 
+                    onPress={handleDisconnectYt}
+                    disabled={ytLoading}
+                  >
+                    <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Tab Selection */}
+            <View style={styles.modalTabs}>
+              <TouchableOpacity 
+                style={[styles.modalTabBtn, ytTab === 'apikey' && styles.modalTabBtnActive]}
+                onPress={() => setYtTab('apikey')}
+              >
+                <Text style={[styles.modalTabText, ytTab === 'apikey' && styles.modalTabTextActive]}>YouTube API Key</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
+                onPress={() => setYtTab('oauth')}
+              >
+                <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Tab: API Key */}
+            {ytTab === 'apikey' ? (
+              <View style={styles.tabBody}>
+                <Text style={styles.modalDesc}>
+                  Enter your YouTube Data API v3 Key and your channel Handle or ID to instantly sync channel subscribers, views, engagement, and videos.
+                </Text>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>YOUTUBE DATA API KEY *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g. AIzaSy..."
+                    placeholderTextColor="#999"
+                    value={ytApiKey}
+                    onChangeText={setYtApiKey}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>CHANNEL HANDLE OR ID *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g. @mkbhd, @GoogleDevelopers, or UC..."
+                    placeholderTextColor="#999"
+                    value={ytChannelId}
+                    onChangeText={setYtChannelId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                {ytModalError ? (
+                  <View style={styles.errorBanner}>
+                    <Text style={styles.errorBannerText}>{ytModalError}</Text>
+                  </View>
+                ) : null}
+
+                {ytModalSuccess ? (
+                  <View style={styles.successBanner}>
+                    <Text style={styles.successBannerText}>{ytModalSuccess}</Text>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity 
+                  style={[styles.modalPrimaryBtn, ytLoading && { opacity: 0.7 }]}
+                  onPress={() => handleApiKeyConnect()}
+                  disabled={ytLoading}
+                >
+                  {ytLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalPrimaryBtnText}>Connect & Fetch Channel Data</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.quickSampleBtn, { marginTop: 4 }]}
+                  onPress={handleQuickDemoConnect}
+                  disabled={ytLoading}
+                >
+                  <Text style={styles.quickSampleText}>⚡ Quick Connect Sample Channel (@GoogleDevelopers)</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Tab: Google OAuth */
+              <View style={styles.tabBody}>
+                <Text style={styles.modalDesc}>
+                  Sign in with your Google account to authorize StreamSync to read your YouTube channel statistics and uploaded videos directly.
+                </Text>
+
+                {ytModalError ? (
+                  <View style={styles.errorBanner}>
+                    <Text style={styles.errorBannerText}>{ytModalError}</Text>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity 
+                  style={styles.googleOAuthBtn}
+                  onPress={() => handleOAuthConnect('yt')}
+                  disabled={syncing === 'yt'}
+                >
+                  <Image source={{ uri: 'https://img.icons8.com/color/512/google-logo.png' }} style={{ width: 20, height: 20, marginRight: 10 }} />
+                  <Text style={styles.googleOAuthBtnText}>
+                    {syncing === 'yt' ? 'Connecting to Google...' : 'Continue with Google'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -432,5 +699,201 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // ─── Modal Styles ───
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {})
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 520,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.15,
+    shadowRadius: 32,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#000',
+    letterSpacing: -0.3,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alreadyConnectedBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginBottom: 20,
+  },
+  modalTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  modalTabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalTabBtnActive: {
+    backgroundColor: '#fff',
+    ...(Platform.OS === 'web' ? { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } : { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
+  },
+  modalTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalTabTextActive: {
+    color: '#000',
+  },
+  tabBody: {
+    gap: 16,
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  formGroup: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#555',
+    letterSpacing: 0.8,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  modalInput: {
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#000',
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  },
+  errorBanner: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 12,
+  },
+  errorBannerText: {
+    color: '#dc2626',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  successBanner: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  successBannerText: {
+    color: '#16a34a',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalPrimaryBtn: {
+    backgroundColor: '#000',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  modalPrimaryBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalSecondaryBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  modalSecondaryBtnText: {
+    color: '#333',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalDangerBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  modalDangerBtnText: {
+    color: '#dc2626',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  quickSampleBtn: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  quickSampleText: {
+    fontSize: 12,
+    color: '#9d50ff',
+    fontWeight: '600',
+  },
+  googleOAuthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 999,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  googleOAuthBtnText: {
+    color: '#222',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

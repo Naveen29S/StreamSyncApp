@@ -1,14 +1,8 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
-
-const POSTS = [
-  { id: '1', title: 'How to build a SaaS in 24 hours', platform: 'YouTube', type: 'Video', views: '142K', date: 'Oct 12', thumbnail: 'https://images.unsplash.com/photo-1627398225058-f4daeb20b410?w=800&q=80', status: 'Published' },
-  { id: '2', title: 'Top 5 design tips for 2026 🎨', platform: 'Instagram', type: 'Image', views: '45K', date: 'Oct 10', thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80', status: 'Published' },
-  { id: '3', title: 'Just launched my new course! Check it out 👇', platform: 'X (Twitter)', type: 'Text', views: '210K', date: 'Oct 9', thumbnail: null, status: 'Published' },
-  { id: '4', title: 'The future of remote work is hybrid', platform: 'LinkedIn', type: 'Article', views: '12K', date: 'Oct 8', thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80', status: 'Published' },
-  { id: '5', title: 'React Native vs Flutter in 2026', platform: 'YouTube', type: 'Video', views: '89K', date: 'Oct 5', thumbnail: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80', status: 'Draft' },
-  { id: '6', title: 'Workspace tour 💻', platform: 'Instagram', type: 'Image', views: '67K', date: 'Oct 1', thumbnail: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&q=80', status: 'Scheduled' },
-];
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Platform, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
+import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '../../lib/api';
+import { useRouter } from 'expo-router';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -18,13 +12,103 @@ const PLATFORM_COLORS = {
   'LinkedIn': '#0A66C2'
 };
 
-export default function ContentScreen() {
-  const [activeFilter, setActiveFilter] = useState('All');
-  const filters = ['All', 'Video', 'Image', 'Text'];
+function formatCompactNumber(num) {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  const n = Number(num);
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return n.toLocaleString();
+}
 
-  const filteredPosts = activeFilter === 'All' 
-    ? POSTS 
-    : POSTS.filter(p => p.type === activeFilter);
+export default function ContentScreen() {
+  const router = useRouter();
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const filters = ['All', 'YouTube', 'Video', 'Image', 'Text'];
+
+  const loadContent = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('content')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('views', { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map(item => {
+        const pName = normalizePlatformName(item.platform);
+        const pKey = normalizePlatformKey(item.platform);
+        const isVideo = pKey === 'yt' || (item.title && item.title.toLowerCase().includes('video'));
+
+        return {
+          id: item.id,
+          title: item.title,
+          platform: pName,
+          platformKey: pKey,
+          type: isVideo ? 'Video' : 'Text',
+          views: formatCompactNumber(item.views),
+          rawViews: Number(item.views || 0),
+          date: item.published_at 
+            ? new Date(item.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Recent',
+          thumbnail: item.thumbnail_url,
+          status: 'Published',
+          engagement: item.engagement !== null && item.engagement !== undefined ? `${Number(item.engagement).toFixed(1)}%` : null
+        };
+      });
+
+      setPosts(mapped);
+    } catch (err) {
+      console.warn("Failed to load content:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadContent();
+
+    let subscription = null;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        subscription = supabase.channel('content-db-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
+            loadContent();
+          })
+          .subscribe();
+      }
+    });
+
+    return () => {
+      if (subscription) supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const handleSyncContent = async () => {
+    setSyncing(true);
+    await syncPlatformData(['yt']);
+    await loadContent();
+    setSyncing(false);
+  };
+
+  const filteredPosts = posts.filter(p => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'YouTube') return p.platformKey === 'yt' || p.platform === 'YouTube';
+    if (activeFilter === 'Video') return p.type === 'Video';
+    if (activeFilter === 'Image') return p.type === 'Image';
+    if (activeFilter === 'Text') return p.type === 'Text';
+    return true;
+  });
 
   return (
     <View style={styles.container}>
@@ -33,10 +117,24 @@ export default function ContentScreen() {
           <Text style={styles.pageTitle}>Content Library</Text>
           <Text style={styles.pageSubtitle}>Manage and organize your posts across all platforms</Text>
         </View>
-        <TouchableOpacity style={styles.createBtn}>
-          <Text style={styles.createBtnIcon}>+</Text>
-          <Text style={styles.createBtnText}>New Post</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity 
+            style={[styles.createBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee' }]}
+            onPress={handleSyncContent}
+            disabled={syncing}
+          >
+            <Text style={[styles.createBtnText, { color: '#000' }]}>
+              {syncing ? 'Syncing...' : '↻ Refresh Data'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.createBtn}
+            onPress={() => router.push('/dashboard/platforms?connect=yt')}
+          >
+            <Text style={styles.createBtnIcon}>+</Text>
+            <Text style={styles.createBtnText}>Connect Channel</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.filterRow}>
@@ -51,39 +149,65 @@ export default function ContentScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.grid}>
-        {filteredPosts.map(post => (
-          <View key={post.id} style={styles.card}>
-            {post.thumbnail ? (
-              <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
-            ) : (
-              <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-                <Text style={styles.textPlaceholderIcon}>📝</Text>
-              </View>
-            )}
-            
-            <View style={styles.cardBody}>
-              <View style={styles.cardTopRow}>
-                <View style={[styles.platformBadge, { backgroundColor: PLATFORM_COLORS[post.platform] + '1A' }]}>
-                  <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[post.platform] }]} />
-                  <Text style={[styles.platformText, { color: PLATFORM_COLORS[post.platform] }]}>{post.platform}</Text>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#9d50ff" />
+          <Text style={{ marginTop: 12, color: '#666' }}>Loading synced content...</Text>
+        </View>
+      ) : filteredPosts.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <Text style={{ fontSize: 36, marginBottom: 12 }}>🎬</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#000', marginBottom: 8 }}>
+            {activeFilter === 'All' ? 'No Synced Videos or Posts' : `No ${activeFilter} Content`}
+          </Text>
+          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', maxWidth: 360, marginBottom: 24, lineHeight: 22 }}>
+            Connect your YouTube channel in Platforms to automatically sync your latest uploads, views, and engagement metrics.
+          </Text>
+          <TouchableOpacity 
+            style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
+            onPress={() => router.push('/dashboard/platforms?connect=yt')}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.grid}>
+          {filteredPosts.map(post => (
+            <View key={post.id} style={styles.card}>
+              {post.thumbnail ? (
+                <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
+              ) : (
+                <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+                  <Text style={styles.textPlaceholderIcon}>🎬</Text>
                 </View>
-                <Text style={styles.statusText(post.status)}>{post.status}</Text>
-              </View>
+              )}
               
-              <Text style={styles.postTitle} numberOfLines={2}>{post.title}</Text>
-              
-              <View style={styles.cardFooter}>
-                <Text style={styles.postDate}>{post.date}</Text>
-                <View style={styles.viewsContainer}>
-                  <Text style={styles.viewsIcon}>👁</Text>
-                  <Text style={styles.viewsText}>{post.views}</Text>
+              <View style={styles.cardBody}>
+                <View style={styles.cardTopRow}>
+                  <View style={[styles.platformBadge, { backgroundColor: PLATFORM_COLORS[post.platform] ? (PLATFORM_COLORS[post.platform] + '1A') : 'rgba(0,0,0,0.06)' }]}>
+                    <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[post.platform] || '#333' }]} />
+                    <Text style={[styles.platformText, { color: PLATFORM_COLORS[post.platform] || '#333' }]}>{post.platform}</Text>
+                  </View>
+                  <Text style={styles.statusText(post.status)}>{post.status}</Text>
+                </View>
+                
+                <Text style={styles.postTitle} numberOfLines={2}>{post.title}</Text>
+                
+                <View style={styles.cardFooter}>
+                  <Text style={styles.postDate}>{post.date}</Text>
+                  <View style={styles.viewsContainer}>
+                    <Text style={styles.viewsIcon}>👁</Text>
+                    <Text style={styles.viewsText}>{post.views} views</Text>
+                    {post.engagement && (
+                      <Text style={[styles.viewsText, { color: '#10b981', marginLeft: 8 }]}>• {post.engagement}</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }

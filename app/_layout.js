@@ -47,7 +47,6 @@ export default function Layout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" />
-        <Stack.Screen name="connects" />
         <Stack.Screen name="dashboard" />
       </Stack>
     </>

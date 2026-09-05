@@ -129,8 +129,8 @@ export default function SettingsScreen() {
                 <Text style={styles.emptyIcon}>🔗</Text>
                 <Text style={styles.emptyTitle}>Manage Connected Platforms</Text>
                 <Text style={styles.emptySub}>Add, remove, or re-authenticate your social media accounts.</Text>
-                <TouchableOpacity style={styles.saveBtn} onPress={() => router.push('/connects')}>
-                  <Text style={styles.saveBtnText}>Go to Connects Page</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={() => router.push('/dashboard/platforms')}>
+                  <Text style={styles.saveBtnText}>Go to Platforms</Text>
                 </TouchableOpacity>
               </View>
             </View>

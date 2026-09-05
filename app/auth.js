@@ -63,7 +63,7 @@ export default function AuthScreen() {
             .from('profiles')
             .select('connected_platforms')
             .eq('id', data.session.user.id)
-            .single();
+            .maybeSingle();
             
           if (!profile?.connected_platforms || profile.connected_platforms.length === 0) {
             router.replace('/dashboard/platforms');
@@ -90,7 +90,7 @@ export default function AuthScreen() {
           .from('profiles')
           .select('connected_platforms')
           .eq('id', data.session.user.id)
-          .single();
+          .maybeSingle();
           
         if (!profile?.connected_platforms || profile.connected_platforms.length === 0) {
           router.replace('/dashboard/platforms');

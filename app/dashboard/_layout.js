@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput } from 'react-native';
 import { Slot, useRouter, usePathname, Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { processSessionOAuthTokens } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 
@@ -19,11 +20,22 @@ export default function DashboardLayout() {
   const pathname = usePathname();
   const [session, setSession] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   
   useEffect(() => {
+    let realtimeSub = null;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/auth');
       setSession(session);
+      if (session) {
+        supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle().then(({ data }) => {
+          if (data?.connected_platforms) setConnectedPlatforms(data.connected_platforms);
+        });
+        if (session.provider_token) {
+          processSessionOAuthTokens(session);
+        }
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -34,7 +46,7 @@ export default function DashboardLayout() {
       setSession(session);
       
         // 1. Sync connected_platforms based strictly on Supabase identities (global sync)
-        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).maybeSingle();
         let newConnected = profile?.connected_platforms || [];
         
         // Cleanup any dirty data (full names) that might have been saved previously
@@ -67,51 +79,35 @@ export default function DashboardLayout() {
            if (error) console.error('DEBUG UPDATE ERROR:', error);
         }
 
+        setConnectedPlatforms(newConnected);
+
         // 2. Handle provider token capture if available
         if (session.provider_token) {
-          console.log("DEBUG: Found provider_token in session:", session.provider_token.substring(0, 15) + "...");
-          const lastProcessedToken = await AsyncStorage.getItem('last_processed_token');
-          if (lastProcessedToken !== session.provider_token) {
-            await AsyncStorage.setItem('last_processed_token', session.provider_token);
-            
-            const pendingPlatform = await AsyncStorage.getItem('pending_connection');
-            let platformId = pendingPlatform;
-            console.log("DEBUG: pendingPlatform:", pendingPlatform);
-            
-            if (!platformId) {
-              const provider = session.user?.app_metadata?.provider;
-              const platformMap = { google: 'yt', facebook: 'fb', twitter: 'x', linkedin_oidc: 'in' };
-              platformId = platformMap[provider];
-            }
+          await processSessionOAuthTokens(session);
+          const { data: p } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
+          if (p?.connected_platforms) setConnectedPlatforms(p.connected_platforms);
+        }
 
-            if (platformId) {
-               console.log("DEBUG: Saving token for platform:", platformId);
-               await AsyncStorage.removeItem('pending_connection');
-               const newApiKeys = { ...(profile?.api_keys || {}) };
-               newApiKeys[platformId] = session.provider_token;
-               
-               console.log("DEBUG: Attempting to save newApiKeys:", newApiKeys);
-               
-               const { data, error } = await supabase.from('profiles').upsert({
-                 id: session.user.id,
-                 email: session.user.email,
-                 api_keys: newApiKeys
-               }, { onConflict: 'id' }).select();
-               
-               if (error) {
-                 console.error("DEBUG: Update API keys error:", error);
-               } else if (!data || data.length === 0) {
-                 console.error("DEBUG: Update returned 0 rows! RLS might be blocking this update or profile is missing!");
-               } else {
-                 console.log("DEBUG: Successfully updated API keys in DB! Row:", data[0]);
-               }
-            }
-          } else {
-             console.log("DEBUG: Token already processed, skipping.");
-          }
+        // 3. Realtime listener for profile and analytics updates
+        if (!realtimeSub) {
+          realtimeSub = supabase.channel('layout-profile-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, (payload) => {
+              if (payload.new?.connected_platforms) {
+                setConnectedPlatforms(payload.new.connected_platforms);
+              }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, async () => {
+              const { data: p } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
+              if (p?.connected_platforms) setConnectedPlatforms(p.connected_platforms);
+            })
+            .subscribe();
         }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      if (realtimeSub) supabase.removeChannel(realtimeSub);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -154,8 +150,10 @@ export default function DashboardLayout() {
         <View style={styles.topbarRight}>
           {/* Sync Status Indicator */}
           <View style={styles.syncStatusPill}>
-            <View style={styles.syncDot} />
-            <Text style={styles.syncStatusText}>All synced</Text>
+            <View style={[styles.syncDot, { backgroundColor: connectedPlatforms.length > 0 ? '#10b981' : '#9d50ff' }]} />
+            <Text style={styles.syncStatusText}>
+              {connectedPlatforms.length > 0 ? `${connectedPlatforms.length} active` : 'Sync ready'}
+            </Text>
           </View>
           
           <TouchableOpacity style={styles.topIconBtn}>
@@ -179,22 +177,29 @@ export default function DashboardLayout() {
           <View style={styles.platformSyncSection}>
             <Text style={styles.sidebarSectionLabel}>PLATFORMS</Text>
             {[
-              { name: 'YouTube', color: '#FF0000', synced: true },
-              { name: 'Instagram', color: '#E1306C', synced: true },
-              { name: 'X', color: '#ffffff', synced: true },
-              { name: 'Facebook', color: '#1877F2', synced: false },
-              { name: 'LinkedIn', color: '#0A66C2', synced: false },
-            ].map((p) => (
-              <View key={p.name} style={styles.platformRow}>
-                <View style={[styles.platformDot, { backgroundColor: p.color }]} />
-                <Text style={styles.platformLabel}>{p.name}</Text>
-                <View style={[styles.syncBadge, p.synced ? styles.syncBadgeActive : styles.syncBadgeIdle]}>
-                  <Text style={[styles.syncBadgeText, p.synced ? styles.syncBadgeTextActive : styles.syncBadgeTextIdle]}>
-                    {p.synced ? 'Live' : 'Idle'}
-                  </Text>
+              { id: 'yt', name: 'YouTube', color: '#FF0000' },
+              { id: 'ig', name: 'Instagram', color: '#E1306C' },
+              { id: 'x', name: 'X', color: '#000000' },
+              { id: 'fb', name: 'Facebook', color: '#1877F2' },
+              { id: 'in', name: 'LinkedIn', color: '#0A66C2' },
+            ].map((p) => {
+              const isSynced = connectedPlatforms.some(cp => {
+                const low = String(cp).toLowerCase();
+                return low === p.id || low === p.name.toLowerCase() || (p.id === 'yt' && (low === 'youtube' || low === 'yt'));
+              });
+
+              return (
+                <View key={p.name} style={styles.platformRow}>
+                  <View style={[styles.platformDot, { backgroundColor: p.color }]} />
+                  <Text style={styles.platformLabel}>{p.name}</Text>
+                  <View style={[styles.syncBadge, isSynced ? styles.syncBadgeActive : styles.syncBadgeIdle]}>
+                    <Text style={[styles.syncBadgeText, isSynced ? styles.syncBadgeTextActive : styles.syncBadgeTextIdle]}>
+                      {isSynced ? 'Live' : 'Idle'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* Navigation */}

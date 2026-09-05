@@ -1,88 +1,266 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Image, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
+import { normalizePlatformName, syncPlatformData } from '../../lib/api';
+import { useRouter } from 'expo-router';
 
-const COMMENTS = [
-  { id: '1', user: 'AlexTech', platform: 'YouTube', color: '#FF0000', text: 'This was super helpful, thanks!', time: '10m', unread: true },
-  { id: '2', user: 'SarahDesign', platform: 'Instagram', color: '#E1306C', text: 'Love the color palette you used here 🔥', time: '1h', unread: true },
-  { id: '3', user: 'DevGuy99', platform: 'X (Twitter)', color: '#000000', text: 'Are you planning to open source this?', time: '3h', unread: false },
-  { id: '4', user: 'MarketingPro', platform: 'LinkedIn', color: '#0A66C2', text: 'Great insights on remote work trends.', time: '5h', unread: false },
-  { id: '5', user: 'JaneDoe', platform: 'YouTube', color: '#FF0000', text: 'Could you do a tutorial on the backend setup?', time: '1d', unread: false },
-];
+const PLATFORM_COLORS = {
+  'YouTube': '#FF0000',
+  'Instagram': '#E1306C',
+  'X (Twitter)': '#000000',
+  'Facebook': '#1877F2',
+  'LinkedIn': '#0A66C2'
+};
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'recently';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = Math.max(0, now - date);
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d`;
+  if (diffHours > 0) return `${diffHours}h`;
+  if (diffMins > 0) return `${diffMins}m`;
+  return 'just now';
+}
 
 export default function CommentsScreen() {
-  const [activeId, setActiveId] = useState('1');
-  
-  const activeComment = COMMENTS.find(c => c.id === activeId);
+  const router = useRouter();
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [activeId, setActiveId] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [replyText, setReplyText] = useState('');
+  const [repliedComments, setRepliedComments] = useState({});
+  const [resolvedMap, setResolvedMap] = useState({});
+
+  const loadComments = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*, content(title, platform)')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((c, index) => {
+        const platformName = normalizePlatformName(c.content?.platform || 'YouTube');
+        return {
+          id: c.id,
+          user: c.author_name || 'YouTube Viewer',
+          avatar: c.author_avatar || null,
+          platform: platformName,
+          videoTitle: c.content?.title || 'YouTube Upload',
+          color: PLATFORM_COLORS[platformName] || '#FF0000',
+          text: c.text || '',
+          time: formatRelativeTime(c.created_at),
+          unread: index < 2,
+          createdAt: c.created_at
+        };
+      });
+
+      setComments(mapped);
+      if (mapped.length > 0 && !activeId) {
+        setActiveId(mapped[0].id);
+      }
+    } catch (err) {
+      console.warn("Failed to load comments:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadComments();
+
+    let subscription = null;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        subscription = supabase.channel('comments-db-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
+            loadComments();
+          })
+          .subscribe();
+      }
+    });
+
+    return () => {
+      if (subscription) supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const handleSyncComments = async () => {
+    setSyncing(true);
+    await syncPlatformData(['yt']);
+    await loadComments();
+    setSyncing(false);
+  };
+
+  const handleSendReply = () => {
+    if (!replyText.trim() || !activeId) return;
+    setRepliedComments(prev => ({
+      ...prev,
+      [activeId]: [...(prev[activeId] || []), replyText.trim()]
+    }));
+    setReplyText('');
+  };
+
+  const handleToggleResolve = () => {
+    if (!activeId) return;
+    setResolvedMap(prev => ({
+      ...prev,
+      [activeId]: !prev[activeId]
+    }));
+  };
+
+  const filteredComments = comments.filter(c => {
+    if (activeFilter === 'Unread') return c.unread && !resolvedMap[c.id];
+    if (activeFilter === 'YouTube') return c.platform === 'YouTube';
+    return true;
+  });
+
+  const activeComment = comments.find(c => c.id === activeId) || filteredComments[0] || null;
+  const isResolved = activeComment ? Boolean(resolvedMap[activeComment.id]) : false;
+  const currentReplies = activeComment ? (repliedComments[activeComment.id] || []) : [];
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.pageTitle}>Inbox</Text>
           <Text style={styles.pageSubtitle}>Respond to your community across all platforms</Text>
         </View>
-        <View style={styles.headerFilters}>
-          <TouchableOpacity style={[styles.filterBtn, styles.filterBtnActive]}>
-            <Text style={[styles.filterBtnText, styles.filterBtnTextActive]}>Unread (2)</Text>
+        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+          <TouchableOpacity 
+            style={styles.refreshBtn} 
+            onPress={handleSyncComments}
+            disabled={syncing}
+          >
+            <Text style={styles.refreshBtnText}>{syncing ? 'Syncing...' : '↻ Refresh'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Text style={styles.filterBtnText}>All</Text>
-          </TouchableOpacity>
+          <View style={styles.headerFilters}>
+            {['All', 'Unread', 'YouTube'].map(f => (
+              <TouchableOpacity 
+                key={f}
+                style={[styles.filterBtn, activeFilter === f && styles.filterBtnActive]}
+                onPress={() => setActiveFilter(f)}
+              >
+                <Text style={[styles.filterBtnText, activeFilter === f && styles.filterBtnTextActive]}>
+                  {f === 'Unread' ? `Unread (${comments.filter(c => c.unread && !resolvedMap[c.id]).length})` : f}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </View>
 
+      {/* Main Inbox Container */}
       <View style={styles.inboxWrapper}>
-        
         {/* Left List */}
         <View style={styles.inboxList}>
-          <ScrollView>
-            {COMMENTS.map((c) => {
-              const isActive = c.id === activeId;
-              return (
-                <TouchableOpacity 
-                  key={c.id} 
-                  style={[styles.commentRow, isActive && styles.commentRowActive]}
-                  onPress={() => setActiveId(c.id)}
-                >
-                  <View style={styles.rowHeader}>
-                    <Text style={[styles.rowUser, isActive && styles.textWhite]}>{c.user}</Text>
-                    <Text style={[styles.rowTime, isActive && styles.textWhite70]}>{c.time}</Text>
-                  </View>
-                  <Text style={[styles.rowPlatform, { color: isActive ? '#fff' : c.color }]} style={[{ fontSize: 10, fontWeight: '700', marginBottom: 6, color: isActive ? 'rgba(255,255,255,0.7)' : c.color }]}>
-                    {c.platform}
-                  </Text>
-                  <Text style={[styles.rowText, isActive && styles.textWhite]} numberOfLines={2}>{c.text}</Text>
-                  {c.unread && !isActive && <View style={styles.unreadDot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#9d50ff" />
+              <Text style={{ marginTop: 8, color: '#888', fontSize: 13 }}>Loading inbox...</Text>
+            </View>
+          ) : filteredComments.length === 0 ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+              <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#000', marginBottom: 4 }}>No Comments Found</Text>
+              <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
+                Connect your YouTube channel in Platforms to view audience comments.
+              </Text>
+              <TouchableOpacity 
+                style={styles.connectLinkBtn}
+                onPress={() => router.push('/dashboard/platforms?connect=yt')}
+              >
+                <Text style={styles.connectLinkText}>Connect YouTube →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView>
+              {filteredComments.map((c) => {
+                const isActive = activeComment && c.id === activeComment.id;
+                const cResolved = Boolean(resolvedMap[c.id]);
+
+                return (
+                  <TouchableOpacity 
+                    key={c.id} 
+                    style={[styles.commentRow, isActive && styles.commentRowActive]}
+                    onPress={() => setActiveId(c.id)}
+                  >
+                    <View style={styles.rowHeader}>
+                      <Text style={[styles.rowUser, isActive && styles.textWhite]} numberOfLines={1}>{c.user}</Text>
+                      <Text style={[styles.rowTime, isActive && styles.textWhite70]}>{c.time}</Text>
+                    </View>
+                    <Text style={[{ fontSize: 11, fontWeight: '700', marginBottom: 6, color: isActive ? 'rgba(255,255,255,0.8)' : c.color }]}>
+                      {c.platform}
+                    </Text>
+                    <Text style={[styles.rowText, isActive && styles.textWhite]} numberOfLines={2}>{c.text}</Text>
+                    {c.unread && !isActive && !cResolved && <View style={styles.unreadDot} />}
+                    {cResolved && (
+                      <View style={[styles.resolvedBadge, isActive && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                        <Text style={[styles.resolvedBadgeText, isActive && { color: '#fff' }]}>✓ Done</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
 
         {/* Right Detail Pane */}
         <View style={styles.inboxDetail}>
           {activeComment ? (
             <View style={styles.detailInner}>
-              
               <View style={styles.detailHeader}>
                 <View style={styles.detailUserWrap}>
-                  <View style={styles.detailAvatar}>
-                    <Text style={styles.detailAvatarText}>{activeComment.user[0]}</Text>
-                  </View>
-                  <View>
+                  {activeComment.avatar ? (
+                    <Image source={{ uri: activeComment.avatar }} style={styles.detailAvatarImg} />
+                  ) : (
+                    <View style={styles.detailAvatar}>
+                      <Text style={styles.detailAvatarText}>{activeComment.user[0]}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={styles.detailUserName}>{activeComment.user}</Text>
-                    <Text style={styles.detailMeta}>via {activeComment.platform} • {activeComment.time} ago</Text>
+                    <Text style={styles.detailMeta} numberOfLines={1}>
+                      via {activeComment.platform} • on "{activeComment.videoTitle}" • {activeComment.time} ago
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.resolveBtn}>
-                  <Text style={styles.resolveBtnText}>✓ Resolve</Text>
+                <TouchableOpacity 
+                  style={[styles.resolveBtn, isResolved && styles.resolveBtnActive]}
+                  onPress={handleToggleResolve}
+                >
+                  <Text style={[styles.resolveBtnText, isResolved && styles.resolveBtnTextActive]}>
+                    {isResolved ? '✓ Resolved' : 'Mark Resolved'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.chatArea}>
                 <View style={styles.chatBubbleRecv}>
                   <Text style={styles.chatTextRecv}>{activeComment.text}</Text>
+                  <Text style={styles.chatTimestamp}>{activeComment.time} ago</Text>
                 </View>
+
+                {currentReplies.map((r, i) => (
+                  <View key={i} style={styles.chatBubbleSent}>
+                    <Text style={styles.chatTextSent}>{r}</Text>
+                    <Text style={styles.chatTimestampSent}>Just now</Text>
+                  </View>
+                ))}
               </ScrollView>
 
               <View style={styles.replyArea}>
@@ -90,21 +268,25 @@ export default function CommentsScreen() {
                   style={styles.replyInput}
                   placeholder={`Reply to ${activeComment.user}...`}
                   placeholderTextColor="#999"
+                  value={replyText}
+                  onChangeText={setReplyText}
                   multiline
                 />
-                <TouchableOpacity style={styles.sendBtn}>
+                <TouchableOpacity 
+                  style={[styles.sendBtn, !replyText.trim() && { opacity: 0.6 }]}
+                  onPress={handleSendReply}
+                  disabled={!replyText.trim()}
+                >
                   <Text style={styles.sendBtnText}>Send</Text>
                 </TouchableOpacity>
               </View>
-              
             </View>
           ) : (
             <View style={styles.emptyDetail}>
-              <Text style={styles.emptyDetailText}>Select a conversation</Text>
+              <Text style={styles.emptyDetailText}>Select a conversation from the left to view details</Text>
             </View>
           )}
         </View>
-
       </View>
     </View>
   );
@@ -135,6 +317,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  refreshBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#eee',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
   headerFilters: {
     flexDirection: 'row',
     backgroundColor: '#eee',
@@ -148,7 +343,7 @@ const styles = StyleSheet.create({
   },
   filterBtnActive: {
     backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
+    ...(Platform.OS === 'web' ? { boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
   },
   filterBtnText: {
     fontSize: 13,
@@ -194,6 +389,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#000',
+    flex: 1,
+    marginRight: 8,
   },
   rowTime: {
     fontSize: 11,
@@ -210,11 +407,24 @@ const styles = StyleSheet.create({
   unreadDot: {
     position: 'absolute',
     top: 24,
-    right: 20,
+    right: 16,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: '#9d50ff',
+  },
+  resolvedBadge: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  resolvedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#16a34a',
   },
 
   inboxDetail: {
@@ -238,6 +448,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
   detailAvatar: {
     width: 44,
@@ -246,6 +457,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#eee',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  detailAvatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   detailAvatarText: {
     fontSize: 18,
@@ -271,10 +487,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.2)',
   },
+  resolveBtnActive: {
+    backgroundColor: '#10b981',
+  },
   resolveBtnText: {
     color: '#10b981',
     fontWeight: '600',
     fontSize: 13,
+  },
+  resolveBtnTextActive: {
+    color: '#fff',
   },
   
   chatArea: {
@@ -290,12 +512,38 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: '#eee',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4,
+    marginBottom: 16,
   },
   chatTextRecv: {
     fontSize: 14,
     color: '#000',
     lineHeight: 22,
+  },
+  chatTimestamp: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 6,
+    textAlign: 'right',
+  },
+  chatBubbleSent: {
+    backgroundColor: '#9d50ff',
+    padding: 16,
+    borderRadius: 16,
+    borderTopRightRadius: 4,
+    maxWidth: '80%',
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+  },
+  chatTextSent: {
+    fontSize: 14,
+    color: '#fff',
+    lineHeight: 22,
+  },
+  chatTimestampSent: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 6,
+    textAlign: 'right',
   },
   
   replyArea: {
@@ -316,7 +564,8 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 16,
     fontSize: 14,
-    minHeight: 80,
+    minHeight: 70,
+    color: '#000',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
   sendBtn: {
@@ -338,10 +587,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
   },
   emptyDetailText: {
     color: '#999',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
+    textAlign: 'center',
+  },
+  connectLinkBtn: {
+    backgroundColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  connectLinkText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { fetchPlatformData, syncPlatformData } from '../../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PLATFORMS = {
@@ -39,17 +39,17 @@ export default function DashboardIndex() {
   }, [params?.error]);
 
   async function handleConnectPress(platformName) {
+    if (platformName === 'YouTube') {
+      router.push('/dashboard/platforms?connect=yt');
+      return;
+    }
+
     let provider = '';
     let scopes = '';
     let queryParams = undefined;
     const dbKeyMap = { 'YouTube': 'yt', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
     
     switch (platformName) {
-      case 'YouTube':
-        provider = 'google';
-        scopes = 'https://www.googleapis.com/auth/youtube.readonly';
-        queryParams = { prompt: 'select_account consent', access_type: 'offline' };
-        break;
       case 'Facebook':
       case 'Instagram':
         provider = 'facebook';
@@ -66,9 +66,7 @@ export default function DashboardIndex() {
 
     if (provider) {
       await AsyncStorage.setItem('pending_connection', dbKeyMap[platformName] || '');
-      
-      const isAlreadyConnected = connectedPlatforms.includes(dbKeyMap[platformName]);
-      
+      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, dbKeyMap[platformName]));
       const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
       
       const { data, error } = await authMethod.call(supabase.auth, {
@@ -89,23 +87,40 @@ export default function DashboardIndex() {
   }
 
   useEffect(() => {
+    let subscription = null;
+
     const loadData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+
+      if (session.provider_token) {
+        await processSessionOAuthTokens(session);
+      }
       
       const { data: profile } = await supabase
         .from('profiles')
         .select('connected_platforms')
         .eq('id', session.user.id)
-        .single();
+        .maybeSingle();
         
       const { data: { user } } = await supabase.auth.getUser();
       const identities = user?.identities || session.user?.identities || [];
       const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
       const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
 
-      // Combine profile platforms and identity platforms as a fallback
-      const platforms = Array.from(new Set([...(profile?.connected_platforms || []), ...identityPlatforms]));
+      // Also check if analytics has any connected platforms recorded
+      const { data: anRows } = await supabase
+        .from('analytics')
+        .select('platform')
+        .eq('user_id', session.user.id);
+      const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
+
+      // Combine profile platforms, identity platforms, and analytics records
+      const platforms = Array.from(new Set([
+        ...(profile?.connected_platforms || []),
+        ...identityPlatforms,
+        ...anPlatforms
+      ]));
       
       setConnectedPlatforms(platforms);
       
@@ -114,13 +129,32 @@ export default function DashboardIndex() {
       setData(apiData);
       setLoading(false);
       
-      // 2. Trigger background sync via Edge Function (updates will flow in via Realtime)
+      // 2. Trigger background sync via Edge Function & direct API
       if (platforms.length > 0) {
         syncPlatformData(platforms);
       }
+
+      // 3. Realtime updates listener
+      subscription = supabase.channel('dashboard-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
+          fetchPlatformData(platforms).then(setData);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
+          fetchPlatformData(platforms).then(setData);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
+          fetchPlatformData(platforms).then(setData);
+        })
+        .subscribe();
     };
     
     loadData();
+
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
   }, []);
 
   if (loading) {
@@ -145,8 +179,8 @@ export default function DashboardIndex() {
           <Text style={styles.pageTitle}>Your Creator Dashboard</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>+ Create Post</Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/dashboard/platforms?connect=yt')}>
+            <Text style={styles.headerBtnText}>+ Connect Channel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -155,12 +189,14 @@ export default function DashboardIndex() {
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingHorizontal: 30 }}>
         <Text style={{ fontSize: 13, color: '#666', marginRight: 12, fontWeight: '600' }}>Active Connections:</Text>
         {connectedPlatforms.length === 0 ? (
-          <Text style={{ fontSize: 13, color: '#ff6b6b', fontWeight: '500' }}>None. Go to Platforms to connect.</Text>
+          <TouchableOpacity onPress={() => router.push('/dashboard/platforms?connect=yt')}>
+            <Text style={{ fontSize: 13, color: '#ff6b6b', fontWeight: '500' }}>None. Click to connect YouTube.</Text>
+          </TouchableOpacity>
         ) : (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {connectedPlatforms.map(platformId => {
               const platformMap = { 'yt': 'YouTube', 'ig': 'Instagram', 'x': 'X (Twitter)', 'fb': 'Facebook', 'in': 'LinkedIn' };
-              const name = platformMap[platformId];
+              const name = platformMap[platformId] || platformId;
               const config = PLATFORMS[name];
               if (!config) return null;
               return (
@@ -178,7 +214,7 @@ export default function DashboardIndex() {
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Total Reach</Text>
-            <Text style={styles.statTrendUp}>↑ 12.4%</Text>
+            <Text style={styles.statTrendUp}>{data.overview.totalViews > 0 ? '↑ Live' : '—'}</Text>
           </View>
           <Text style={styles.statValue}>{data.overview.totalViews.toLocaleString()}</Text>
           <Text style={styles.statCaption}>Combined views across all platforms</Text>
@@ -187,7 +223,7 @@ export default function DashboardIndex() {
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Audience</Text>
-            <Text style={styles.statTrendUp}>↑ 5.2%</Text>
+            <Text style={styles.statTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Active' : '—'}</Text>
           </View>
           <Text style={styles.statValue}>{data.overview.totalFollowers.toLocaleString()}</Text>
           <Text style={styles.statCaption}>Followers & subscribers unified</Text>
@@ -196,9 +232,11 @@ export default function DashboardIndex() {
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Engagement</Text>
-            <Text style={styles.statTrendDown}>↓ 1.1%</Text>
+            <Text style={styles.statTrendUp}>
+              {parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time' : '—'}
+            </Text>
           </View>
-          <Text style={styles.statValue}>4.8%</Text>
+          <Text style={styles.statValue}>{data.overview.engagementRate || '0.0%'}</Text>
           <Text style={styles.statCaption}>Average across connected platforms</Text>
         </View>
 
@@ -206,7 +244,7 @@ export default function DashboardIndex() {
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Revenue</Text>
             {data.overview.estimatedRevenue >= 0 && (
-              <Text style={styles.statTrendUp}>↑ 8.1%</Text>
+              <Text style={styles.statTrendUp}>↑ Est.</Text>
             )}
           </View>
           <Text style={styles.statValue}>
@@ -231,9 +269,9 @@ export default function DashboardIndex() {
       <View style={styles.platformGrid}>
         {Object.entries(PLATFORMS).map(([name, config]) => {
           const dbKeyMap = { 'YouTube': 'yt', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
-          const isConnected = connectedPlatforms.includes(dbKeyMap[name]);
+          const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, dbKeyMap[name]));
           const stats = data?.platformStats?.[name];
-          const hasApiData = stats && stats.followers !== '0' && stats.followers !== 0 && stats.followers !== undefined;
+          const hasApiData = Boolean(stats && (stats.rawFollowers !== undefined || stats.rawViews !== undefined));
           
           let statusText = 'Not connected';
           let dotStyle = styles.statusDotOff;
@@ -243,8 +281,8 @@ export default function DashboardIndex() {
               statusText = 'Receiving Data (Live)';
               dotStyle = styles.statusDotLive;
             } else {
-              statusText = 'API Data Unavailable';
-              dotStyle = { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff6b6b' }; // Red warning dot
+              statusText = 'Connected (Sync Ready)';
+              dotStyle = { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9d50ff' };
             }
           }
 
@@ -272,7 +310,7 @@ export default function DashboardIndex() {
                     onPress={() => handleConnectPress(name)} 
                     style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#f5f5f5', borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}
                   >
-                    <Text style={{ fontSize: 12, color: '#555', fontWeight: '600' }}>Reconnect</Text>
+                    <Text style={{ fontSize: 12, color: '#555', fontWeight: '600' }}>Manage</Text>
                   </TouchableOpacity>
                 )}
                 <View style={[styles.statusDot, dotStyle]} />
@@ -296,7 +334,7 @@ export default function DashboardIndex() {
                   <View style={styles.platformMetricDivider} />
                   <View style={styles.platformMetricItem}>
                     <Text style={styles.platformMetricVal}>
-                      {data.platformStats?.[name]?.engage || '0%'}
+                      {data.platformStats?.[name]?.engage || '0.0%'}
                     </Text>
                     <Text style={styles.platformMetricLabel}>Engage</Text>
                   </View>
@@ -330,14 +368,30 @@ export default function DashboardIndex() {
       </View>
 
       <View style={styles.contentFeed}>
-        {data.topContent.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>◫</Text>
-            <Text style={styles.emptyTitle}>No content synced yet</Text>
-            <Text style={styles.emptySub}>Connect your platforms above to start seeing your content here.</Text>
-          </View>
-        ) : (
-          data.topContent.map((item) => {
+        {(() => {
+          const filteredContent = (data.topContent || []).filter((item) => {
+            if (activeTab === 'all') return true;
+            if (activeTab === 'X') return item.platform.includes('X') || item.platform.includes('Twitter');
+            return item.platform.toLowerCase() === activeTab.toLowerCase();
+          });
+
+          if (filteredContent.length === 0) {
+            return (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>◫</Text>
+                <Text style={styles.emptyTitle}>
+                  {activeTab === 'all' ? 'No content synced yet' : `No ${activeTab} content synced yet`}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {activeTab === 'all'
+                    ? 'Connect your platforms above to start seeing your content here.'
+                    : `Connect your ${activeTab} account in Platforms to start seeing your posts here.`}
+                </Text>
+              </View>
+            );
+          }
+
+          return filteredContent.map((item) => {
             const platformConf = PLATFORMS[item.platform] || { color: '#5a6270', bg: 'rgba(255,255,255,0.04)', icon: '?' };
             return (
               <View key={item.id} style={styles.contentRow}>
@@ -359,6 +413,7 @@ export default function DashboardIndex() {
                       <Text style={[styles.contentPlatformChipText, { color: platformConf.color }]}>{item.platform}</Text>
                     </View>
                     <Text style={styles.contentMetaText}>{item.views} views</Text>
+                    <Text style={[styles.contentMetaText, { color: '#10b981' }]}>• {item.engage} engage</Text>
                   </View>
                 </View>
                 {/* Actions */}
@@ -367,8 +422,8 @@ export default function DashboardIndex() {
                 </TouchableOpacity>
               </View>
             );
-          })
-        )}
+          });
+        })()}
       </View>
 
       {/* ─── Activity Stream ─── */}

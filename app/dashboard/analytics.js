@@ -5,6 +5,20 @@ import { fetchPlatformData, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
+function formatCompactNumber(num) {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  const n = Number(num);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1000000) {
+    return sign + (abs / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (abs >= 1000) {
+    return sign + (abs / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return n.toLocaleString();
+}
+
 export default function AnalyticsScreen() {
   const [timeframe, setTimeframe] = useState('7D');
   const [data, setData] = useState(null);
@@ -20,8 +34,17 @@ export default function AnalyticsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      const { data: profile } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).single();
-      const platforms = profile?.connected_platforms || [];
+      const { data: profile } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      const identities = user?.identities || session.user?.identities || [];
+      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
+      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+      // Also query analytics rows directly
+      const { data: anRows } = await supabase.from('analytics').select('platform').eq('user_id', session.user.id);
+      const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
+
+      const platforms = Array.from(new Set([...(profile?.connected_platforms || []), ...identityPlatforms, ...anPlatforms]));
       setConnectedPlatforms(platforms);
       
       const platformData = await fetchPlatformData(platforms);
@@ -64,8 +87,15 @@ export default function AnalyticsScreen() {
     );
   }
 
-  // Empty State if no platforms are connected
-  if (connectedPlatforms.length === 0) {
+  // Empty State if no platforms or analytics data exist
+  const hasAnalyticsData = Boolean(
+    connectedPlatforms.length > 0 ||
+    (data?.overview?.totalFollowers || 0) > 0 ||
+    (data?.overview?.totalViews || 0) > 0 ||
+    (data?.platformStats && Object.keys(data.platformStats).length > 0)
+  );
+
+  if (!hasAnalyticsData) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
         <Feather name="bar-chart-2" size={64} color="#ccc" style={{ marginBottom: 24 }} />
@@ -117,13 +147,13 @@ export default function AnalyticsScreen() {
       <View style={styles.topMetricsRow}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>TOTAL AUDIENCE</Text>
-          <Text style={styles.metricValue}>{(data.overview.totalFollowers / 1000000).toFixed(1)}M</Text>
-          <Text style={styles.metricTrendUp}>↑ 124K this week</Text>
+          <Text style={styles.metricValue}>{formatCompactNumber(data.overview.totalFollowers)}</Text>
+          <Text style={styles.metricTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Unified Audience' : '—'}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>ENGAGEMENT RATE</Text>
-          <Text style={styles.metricValue}>5.2%</Text>
-          <Text style={styles.metricTrendUp}>↑ 0.4% this week</Text>
+          <Text style={styles.metricValue}>{data.overview.engagementRate || '0.0%'}</Text>
+          <Text style={styles.metricTrendUp}>{parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time average' : '—'}</Text>
         </View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>REVENUE (EST)</Text>
@@ -133,7 +163,7 @@ export default function AnalyticsScreen() {
               : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
           </Text>
           {data.overview.estimatedRevenue >= 0 ? (
-            <Text style={styles.metricTrendDown}>↓ $120 this week</Text>
+            <Text style={styles.metricTrendUp}>↑ Estimated earnings</Text>
           ) : (
             <Text style={[styles.metricTrendDown, { color: '#888' }]}>Grow audience to monetize</Text>
           )}
@@ -204,7 +234,7 @@ export default function AnalyticsScreen() {
               ))}
             </View>
           ) : (
-             <Text style={{ color: '#888', fontSize: 14 }}>Demographics not available.</Text>
+             <Text style={{ color: '#888', fontSize: 14 }}>Demographics will unlock as platform data grows.</Text>
           )}
         </View>
       </View>
@@ -219,23 +249,35 @@ export default function AnalyticsScreen() {
           </View>
           
           <View style={styles.contentList}>
-            {data.topContent.map(item => (
-              <View key={item.id} style={styles.contentItem}>
-                <Image source={{ uri: item.thumb }} style={styles.contentThumb} />
-                <View style={styles.contentInfo}>
-                  <Text style={styles.contentTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.contentPlatform}>{item.platform}</Text>
-                </View>
-                <View style={styles.contentStats}>
-                  <Text style={styles.contentStatMain}>{item.views}</Text>
-                  <Text style={styles.contentStatSub}>Views</Text>
-                </View>
-                <View style={styles.contentStats}>
-                  <Text style={[styles.contentStatMain, { color: '#10b981' }]}>{item.engage}</Text>
-                  <Text style={styles.contentStatSub}>Engage</Text>
-                </View>
+            {data.topContent.length === 0 ? (
+              <View style={{ padding: 24, alignItems: 'center' }}>
+                <Text style={{ color: '#888', fontSize: 13 }}>No content synced yet. Connect YouTube in Platforms.</Text>
               </View>
-            ))}
+            ) : (
+              data.topContent.map(item => (
+                <View key={item.id} style={styles.contentItem}>
+                  {item.thumbnail ? (
+                    <Image source={{ uri: item.thumbnail }} style={styles.contentThumb} />
+                  ) : (
+                    <View style={[styles.contentThumb, { justifyContent: 'center', alignItems: 'center' }]}>
+                      <Text style={{ fontSize: 18 }}>▶</Text>
+                    </View>
+                  )}
+                  <View style={styles.contentInfo}>
+                    <Text style={styles.contentTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.contentPlatform}>{item.platform}</Text>
+                  </View>
+                  <View style={styles.contentStats}>
+                    <Text style={styles.contentStatMain}>{item.views}</Text>
+                    <Text style={styles.contentStatSub}>Views</Text>
+                  </View>
+                  <View style={styles.contentStats}>
+                    <Text style={[styles.contentStatMain, { color: '#10b981' }]}>{item.engage}</Text>
+                    <Text style={styles.contentStatSub}>Engage</Text>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
@@ -248,6 +290,7 @@ export default function AnalyticsScreen() {
               <Text style={[styles.tableCell, { flex: 1.5 }]}>Platform</Text>
               <Text style={styles.tableCell}>Views</Text>
               <Text style={styles.tableCell}>Followers</Text>
+              <Text style={styles.tableCell}>Engage</Text>
             </View>
             
             {Object.entries(data.platformStats).map(([platform, stats], i) => (
@@ -258,6 +301,7 @@ export default function AnalyticsScreen() {
                 </View>
                 <Text style={[styles.tableCell, styles.cellValue]}>{stats.views}</Text>
                 <Text style={[styles.tableCell, styles.cellValue]}>{stats.followers}</Text>
+                <Text style={[styles.tableCell, styles.cellValue, { color: '#10b981' }]}>{stats.engage}</Text>
               </View>
             ))}
           </View>

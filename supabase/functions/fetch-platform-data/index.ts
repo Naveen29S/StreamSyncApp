@@ -31,116 +31,201 @@ serve(async (req) => {
       .from('profiles')
       .select('api_keys')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
       
     const apiKeys = profile?.api_keys || {}
 
     // We will clear existing content/comments for the requested platforms and insert the latest batch
     // to avoid duplicates since we don't have an external_id unique constraint.
+    // Normalize platforms to update and variants
     const platformsToUpdate = platforms.map((p: string) => p.toLowerCase());
-    if (platformsToUpdate.length > 0) {
-      await supabase.from('content').delete().eq('user_id', user.id).in('platform', platformsToUpdate);
-      await supabase.from('comments').delete().eq('user_id', user.id); // Clear all comments for simplicity
+    const platformDeleteVariants: string[] = [];
+    for (const p of platformsToUpdate) {
+      platformDeleteVariants.push(p);
+      if (p === 'yt' || p === 'youtube') {
+        platformDeleteVariants.push('yt', 'youtube', 'YouTube');
+      } else if (p === 'fb' || p === 'facebook') {
+        platformDeleteVariants.push('fb', 'facebook', 'Facebook');
+      } else if (p === 'ig' || p === 'instagram') {
+        platformDeleteVariants.push('ig', 'instagram', 'Instagram');
+      } else if (p === 'x' || p === 'twitter') {
+        platformDeleteVariants.push('x', 'twitter', 'X', 'X (Twitter)');
+      } else if (p === 'in' || p === 'linkedin') {
+        platformDeleteVariants.push('in', 'linkedin', 'LinkedIn');
+      }
+    }
+
+    if (platformDeleteVariants.length > 0) {
+      await supabase.from('content').delete().eq('user_id', user.id).in('platform', platformDeleteVariants);
     }
 
     // ==========================================
-    // YOUTUBE INTEGRATION
+    // YOUTUBE INTEGRATION (OAuth or API Key)
     // ==========================================
-    if ((platformsToUpdate.includes('yt') || platformsToUpdate.includes('youtube')) && apiKeys['yt']) {
+    const ytKeyEntry = apiKeys['youtube'] || apiKeys['yt'];
+    if ((platformsToUpdate.includes('yt') || platformsToUpdate.includes('youtube')) && ytKeyEntry) {
       try {
-        const token = apiKeys['yt'];
-        
-        // 1. Channel Stats
-        const channelRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=statistics,contentDetails&mine=true`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const channelData = await channelRes.json();
-        
-        let uploadsPlaylistId = null;
+        const rawKeyOrToken = typeof ytKeyEntry === 'object' ? (ytKeyEntry.apiKey || ytKeyEntry.token) : ytKeyEntry;
+        const channelId = apiKeys['youtube_channel_id'] || apiKeys['yt_channel_id'] || (typeof ytKeyEntry === 'object' ? ytKeyEntry.channelId : undefined);
+        const isApiKey = String(rawKeyOrToken).startsWith('AIza') || Boolean(channelId);
 
-        if (channelData.items && channelData.items.length > 0) {
-          const stats = channelData.items[0].statistics;
-          uploadsPlaylistId = channelData.items[0].contentDetails?.relatedPlaylists?.uploads;
-          
-          const subs = parseInt(stats.subscriberCount || '0');
-          // Heuristic: If subs > 1000, consider monetized for UI demonstration.
-          // We use -1 to signify "Unmonetized" to the frontend.
-          const isMonetized = subs > 1000;
-          
-          await supabase.from('analytics').upsert({
-            user_id: user.id,
-            platform: 'yt',
-            total_views: parseInt(stats.viewCount || '0'),
-            total_followers: subs,
-            engagement_rate: 0, 
-            estimated_revenue: isMonetized ? 150.50 : -1,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id,platform' });
-        }
+        let channelData: any = null;
 
-        // 2. Recent Videos & Comments
-        if (uploadsPlaylistId) {
-          const playlistRes = await fetch(`https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=5`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const playlistData = await playlistRes.json();
-          
-          if (playlistData.items && playlistData.items.length > 0) {
-            const videoIds = playlistData.items.map((i: any) => i.snippet.resourceId.videoId).join(',');
-            
-            const vidStatsRes = await fetch(`https://youtube.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            const vidStatsData = await vidStatsRes.json();
-            const statsMap: any = {};
-            if (vidStatsData.items) {
-              vidStatsData.items.forEach((v: any) => { statsMap[v.id] = v.statistics; });
+        if (isApiKey && channelId) {
+          // Fetch via API Key + Channel ID / Handle
+          let channelUrl = '';
+          if (channelId.startsWith('UC') && channelId.length >= 20) {
+            channelUrl = `https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${encodeURIComponent(channelId)}&key=${encodeURIComponent(rawKeyOrToken)}`;
+          } else {
+            const handleParam = channelId.startsWith('@') ? channelId : `@${channelId}`;
+            channelUrl = `https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&forHandle=${encodeURIComponent(handleParam)}&key=${encodeURIComponent(rawKeyOrToken)}`;
+          }
+          const channelRes = await fetch(channelUrl);
+          if (channelRes.ok) {
+            channelData = await channelRes.json();
+          }
+
+          // Fallback to forUsername if handle returned no items
+          if ((!channelData?.items || channelData.items.length === 0) && !channelId.startsWith('UC')) {
+            const cleanName = channelId.replace(/^@/, '');
+            const fallbackRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&forUsername=${encodeURIComponent(cleanName)}&key=${encodeURIComponent(rawKeyOrToken)}`);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              if (fallbackData?.items && fallbackData.items.length > 0) {
+                channelData = fallbackData;
+              }
             }
+          }
+        } else {
+          // Fetch via OAuth Token
+          const channelRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true`, {
+            headers: { Authorization: `Bearer ${rawKeyOrToken}` }
+          });
+          if (channelRes.ok) {
+            channelData = await channelRes.json();
+          }
+        }
+        
+        let uploadsPlaylistId: string | null = null;
+        let channelTitle = 'YouTube Channel';
 
-            for (const item of playlistData.items) {
-              const vid = item.snippet.resourceId.videoId;
-              const snippet = item.snippet;
-              const vStats = statsMap[vid] || {};
-              const views = parseInt(vStats.viewCount || '0');
-              const likes = parseInt(vStats.likeCount || '0');
-              const comments = parseInt(vStats.commentCount || '0');
-              const engagement = views > 0 ? ((likes + comments) / views) * 100 : 0;
+        if (channelData?.items && channelData.items.length > 0) {
+          const item = channelData.items[0];
+          const stats = item.statistics || {};
+          const snippet = item.snippet || {};
+          channelTitle = snippet.title || channelTitle;
+          uploadsPlaylistId = item.contentDetails?.relatedPlaylists?.uploads || null;
+          
+          const subs = parseInt(stats.subscriberCount || '0', 10);
+          const totalViews = parseInt(stats.viewCount || '0', 10);
+          const videoCount = parseInt(stats.videoCount || '0', 10);
+          const isMonetized = subs >= 1000;
+          let calculatedEngagementRate = 0;
+          let totalRecentInteractions = 0;
+          let totalRecentViews = 0;
 
-              // Insert Content
-              const { data: contentRow } = await supabase.from('content').insert({
-                user_id: user.id,
-                title: snippet.title,
-                platform: 'yt',
-                views: views,
-                engagement: parseFloat(engagement.toFixed(2)),
-                thumbnail_url: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
-                published_at: snippet.publishedAt
-              }).select('id').single();
+          // 2. Recent Videos & Comments
+          if (uploadsPlaylistId) {
+            const playlistUrl = isApiKey
+              ? `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8&key=${encodeURIComponent(rawKeyOrToken)}`
+              : `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8`;
+            
+            const playlistRes = await fetch(playlistUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+            const playlistData = await playlistRes.json();
+            
+            if (playlistData.items && playlistData.items.length > 0) {
+              const videoIds = playlistData.items
+                .map((i: any) => i.snippet?.resourceId?.videoId || i.contentDetails?.videoId)
+                .filter(Boolean)
+                .join(',');
+              
+              if (videoIds) {
+                const vidStatsUrl = isApiKey
+                  ? `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}&key=${encodeURIComponent(rawKeyOrToken)}`
+                  : `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}`;
+                
+                const vidStatsRes = await fetch(vidStatsUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+                const vidStatsData = await vidStatsRes.json();
+                const statsMap: any = {};
+                if (vidStatsData.items) {
+                  vidStatsData.items.forEach((v: any) => { statsMap[v.id] = v; });
+                }
 
-              // Fetch 1 recent comment for this video
-              if (contentRow && comments > 0) {
-                try {
-                  const commentsRes = await fetch(`https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${vid}&maxResults=1`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  const commentsData = await commentsRes.json();
-                  if (commentsData.items && commentsData.items.length > 0) {
-                    const comment = commentsData.items[0].snippet.topLevelComment.snippet;
-                    await supabase.from('comments').insert({
-                      user_id: user.id,
-                      content_id: contentRow.id,
-                      author_name: comment.authorDisplayName,
-                      author_avatar: comment.authorProfileImageUrl,
-                      text: comment.textDisplay,
-                      created_at: comment.publishedAt
-                    });
+                for (const plItem of playlistData.items) {
+                  const vid = plItem.snippet?.resourceId?.videoId || plItem.contentDetails?.videoId;
+                  const vObj = statsMap[vid] || {};
+                  const vSnippet = vObj.snippet || plItem.snippet || {};
+                  const vStats = vObj.statistics || {};
+
+                  const views = parseInt(vStats.viewCount || '0', 10);
+                  const likes = parseInt(vStats.likeCount || '0', 10);
+                  const comments = parseInt(vStats.commentCount || '0', 10);
+                  const engagement = views > 0 ? parseFloat((((likes + comments) / views) * 100).toFixed(2)) : 0;
+
+                  totalRecentViews += views;
+                  totalRecentInteractions += (likes + comments);
+
+                  // Insert Content
+                  const { data: contentRow } = await supabase.from('content').insert({
+                    user_id: user.id,
+                    title: vSnippet.title || 'YouTube Video',
+                    platform: 'yt',
+                    views: views,
+                    engagement: engagement,
+                    thumbnail_url: vSnippet.thumbnails?.high?.url || vSnippet.thumbnails?.medium?.url || vSnippet.thumbnails?.default?.url,
+                    published_at: vSnippet.publishedAt || new Date().toISOString()
+                  }).select('id').single();
+
+                  // Fetch 1 recent comment for this video if available
+                  if (contentRow && comments > 0) {
+                    try {
+                      const commentsUrl = isApiKey
+                        ? `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1&key=${encodeURIComponent(rawKeyOrToken)}`
+                        : `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1`;
+                      
+                      const commentsRes = await fetch(commentsUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+                      const commentsData = await commentsRes.json();
+                      if (commentsData.items && commentsData.items.length > 0) {
+                        const topSnippet = commentsData.items[0].snippet?.topLevelComment?.snippet;
+                        if (topSnippet) {
+                          await supabase.from('comments').insert({
+                            user_id: user.id,
+                            content_id: contentRow.id,
+                            author_name: topSnippet.authorDisplayName || 'YouTube Viewer',
+                            author_avatar: topSnippet.authorProfileImageUrl || null,
+                            text: topSnippet.textDisplay || '',
+                            created_at: topSnippet.publishedAt || new Date().toISOString()
+                          });
+                        }
+                      }
+                    } catch (ce) {
+                      console.error("YT Comments Error:", ce);
+                    }
                   }
-                } catch (ce) {
-                   console.error("YT Comments Error:", ce);
                 }
               }
             }
           }
+
+          if (totalRecentViews > 0) {
+            calculatedEngagementRate = parseFloat(((totalRecentInteractions / totalRecentViews) * 100).toFixed(2));
+          } else if (subs > 0 && totalViews > 0) {
+            calculatedEngagementRate = parseFloat(((totalViews / (subs * Math.max(videoCount, 1))) * 10).toFixed(2));
+          }
+
+          const estimatedRevenue = isMonetized ? parseFloat(((totalViews / 1000) * 1.5).toFixed(2)) : -1;
+
+          await supabase.from('analytics').delete().eq('user_id', user.id).in('platform', ['YouTube', 'youtube']);
+
+          await supabase.from('analytics').upsert({
+            user_id: user.id,
+            platform: 'yt',
+            total_views: totalViews,
+            total_followers: subs,
+            engagement_rate: calculatedEngagementRate,
+            estimated_revenue: estimatedRevenue,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,platform' });
         }
       } catch (e) {
         console.error("YouTube Error:", e);
