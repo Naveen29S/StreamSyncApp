@@ -29,6 +29,7 @@ export default function ContentScreen() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState('All');
   const [posts, setPosts] = useState([]);
+  const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
@@ -39,6 +40,43 @@ export default function ContentScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('connected_platforms, api_keys')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const identities = session.user?.identities || [];
+      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+      const profileKeys = profile?.api_keys || {};
+      const keyPlatforms = [];
+      if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
+        keyPlatforms.push('yt');
+      }
+
+      const { data: anRows } = await supabase
+        .from('analytics')
+        .select('platform')
+        .eq('user_id', session.user.id);
+      const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+      const rawList = [
+        ...(profile?.connected_platforms || []),
+        ...identityPlatforms,
+        ...keyPlatforms,
+        ...anPlatforms
+      ];
+      const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
+      setConnectedPlatforms(platforms);
+
+      if (platforms.length === 0) {
+        setPosts([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('content')
         .select('*')
@@ -47,27 +85,29 @@ export default function ContentScreen() {
 
       if (error) throw error;
 
-      const mapped = (data || []).map(item => {
-        const pName = normalizePlatformName(item.platform);
-        const pKey = normalizePlatformKey(item.platform);
-        const isVideo = pKey === 'yt' || (item.title && item.title.toLowerCase().includes('video'));
+      const mapped = (data || [])
+        .filter(item => connectedPlatforms.includes(normalizePlatformKey(item.platform)))
+        .map(item => {
+          const pName = normalizePlatformName(item.platform);
+          const pKey = normalizePlatformKey(item.platform);
+          const isVideo = pKey === 'yt' || (item.title && item.title.toLowerCase().includes('video'));
 
-        return {
-          id: item.id,
-          title: item.title,
-          platform: pName,
-          platformKey: pKey,
-          type: isVideo ? 'Video' : 'Text',
-          views: formatCompactNumber(item.views),
-          rawViews: Number(item.views || 0),
-          date: item.published_at 
-            ? new Date(item.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'Recent',
-          thumbnail: item.thumbnail_url,
-          status: 'Published',
-          engagement: item.engagement !== null && item.engagement !== undefined ? `${Number(item.engagement).toFixed(1)}%` : null
-        };
-      });
+          return {
+            id: item.id,
+            title: item.title,
+            platform: pName,
+            platformKey: pKey,
+            type: isVideo ? 'Video' : 'Text',
+            views: formatCompactNumber(item.views),
+            rawViews: Number(item.views || 0),
+            date: item.published_at 
+              ? new Date(item.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              : 'Recent',
+            thumbnail: item.thumbnail_url,
+            status: 'Published',
+            engagement: item.engagement !== null && item.engagement !== undefined ? `${Number(item.engagement).toFixed(1)}%` : null
+          };
+        });
 
       setPosts(mapped);
     } catch (err) {
@@ -78,27 +118,46 @@ export default function ContentScreen() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    let subscription = null;
+
     loadContent();
 
-    let subscription = null;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        subscription = supabase.channel('content-db-sync')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-            loadContent();
-          })
-          .subscribe();
+      if (!isMounted || !session) return;
+
+      const channelName = `content-db-sync-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase.channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
+          if (isMounted) loadContent();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
+          if (isMounted) loadContent();
+        });
+
+      if (!isMounted) {
+        supabase.removeChannel(channel);
+        return;
       }
+
+      subscription = channel;
+      channel.subscribe();
     });
 
     return () => {
-      if (subscription) supabase.removeChannel(subscription);
+      isMounted = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+        subscription = null;
+      }
     };
   }, []);
 
   const handleSyncContent = async () => {
     setSyncing(true);
-    await syncPlatformData(['yt']);
+    if (connectedPlatforms.length > 0) {
+      await syncPlatformData(connectedPlatforms);
+    }
     await loadContent();
     setSyncing(false);
   };
@@ -163,14 +222,28 @@ export default function ContentScreen() {
             {activeFilter === 'All' ? 'No Synced Videos or Posts' : `No ${activeFilter} Content`}
           </Text>
           <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', maxWidth: 360, marginBottom: 24, lineHeight: 22 }}>
-            Connect your YouTube channel to automatically sync your latest uploads, views, and engagement metrics.
+            {connectedPlatforms.includes('yt')
+              ? 'Your YouTube channel is connected and active. Once videos are published, they will sync and appear here automatically.'
+              : 'Connect your YouTube channel to automatically sync your latest uploads, views, and engagement metrics.'}
           </Text>
-          <TouchableOpacity 
-            style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
-            onPress={() => setConnectModalVisible(true)}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
-          </TouchableOpacity>
+          {connectedPlatforms.includes('yt') ? (
+            <TouchableOpacity 
+              style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
+              onPress={handleSyncContent}
+              disabled={syncing}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                {syncing ? 'Syncing...' : '↻ Refresh Channel Sync'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
+              onPress={() => setConnectModalVisible(true)}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.grid}>

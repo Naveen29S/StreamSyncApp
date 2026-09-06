@@ -26,52 +26,42 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("Unauthorized")
 
-    // Fetch API Keys
+    // Fetch API Keys & Connected Platforms
     const { data: profile } = await supabase
       .from('profiles')
-      .select('api_keys')
+      .select('api_keys, connected_platforms')
       .eq('id', user.id)
       .maybeSingle()
       
     const apiKeys = profile?.api_keys || {}
 
-    // We will clear existing content/comments for the requested platforms and insert the latest batch
-    // to avoid duplicates since we don't have an external_id unique constraint.
-    // Normalize platforms to update and variants
-    const platformsToUpdate = platforms.map((p: string) => p.toLowerCase());
-    const platformDeleteVariants: string[] = [];
-    for (const p of platformsToUpdate) {
-      platformDeleteVariants.push(p);
-      if (p === 'yt' || p === 'youtube') {
-        platformDeleteVariants.push('yt', 'youtube', 'YouTube');
-      } else if (p === 'fb' || p === 'facebook') {
-        platformDeleteVariants.push('fb', 'facebook', 'Facebook');
-      } else if (p === 'ig' || p === 'instagram') {
-        platformDeleteVariants.push('ig', 'instagram', 'Instagram');
-      } else if (p === 'x' || p === 'twitter') {
-        platformDeleteVariants.push('x', 'twitter', 'X', 'X (Twitter)');
-      } else if (p === 'in' || p === 'linkedin') {
-        platformDeleteVariants.push('in', 'linkedin', 'LinkedIn');
-      }
-    }
-
-    if (platformDeleteVariants.length > 0) {
-      await supabase.from('content').delete().eq('user_id', user.id).in('platform', platformDeleteVariants);
-    }
+    // Normalize platforms to update
+    const platformsToUpdate = (platforms || []).map((p: string) => p.toLowerCase());
 
     // ==========================================
     // YOUTUBE INTEGRATION (OAuth or API Key)
     // ==========================================
-    const ytKeyEntry = apiKeys['youtube'] || apiKeys['yt'];
+    const ytKeyEntry = apiKeys['youtube'] || apiKeys['yt'] || apiKeys['youtube_token'] || apiKeys['google_provider_token'];
     if ((platformsToUpdate.includes('yt') || platformsToUpdate.includes('youtube')) && ytKeyEntry) {
       try {
         const rawKeyOrToken = typeof ytKeyEntry === 'object' ? (ytKeyEntry.apiKey || ytKeyEntry.token) : ytKeyEntry;
         const channelId = apiKeys['youtube_channel_id'] || apiKeys['yt_channel_id'] || (typeof ytKeyEntry === 'object' ? ytKeyEntry.channelId : undefined);
-        const isApiKey = String(rawKeyOrToken).startsWith('AIza') || Boolean(channelId);
+        
+        // Fix: ya29 tokens are OAuth Bearer tokens, NOT API keys
+        const isOAuth = String(rawKeyOrToken).startsWith('ya29.') || Boolean(typeof ytKeyEntry === 'object' && ytKeyEntry.token) || Boolean(apiKeys['youtube_token'] && rawKeyOrToken === apiKeys['youtube_token']);
+        const isApiKey = !isOAuth && (String(rawKeyOrToken).startsWith('AIza') || rawKeyOrToken === 'DEMO' || Boolean(channelId));
 
         let channelData: any = null;
 
-        if (isApiKey && channelId) {
+        if (isOAuth) {
+          // Fetch via OAuth Token: Call mine=true with Bearer header, NO &key=
+          const channelRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true`, {
+            headers: { Authorization: `Bearer ${rawKeyOrToken}` }
+          });
+          if (channelRes.ok) {
+            channelData = await channelRes.json();
+          }
+        } else if (isApiKey && channelId) {
           // Fetch via API Key + Channel ID / Handle
           let channelUrl = '';
           if (channelId.startsWith('UC') && channelId.length >= 20) {
@@ -96,14 +86,6 @@ serve(async (req) => {
               }
             }
           }
-        } else {
-          // Fetch via OAuth Token
-          const channelRes = await fetch(`https://youtube.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true`, {
-            headers: { Authorization: `Bearer ${rawKeyOrToken}` }
-          });
-          if (channelRes.ok) {
-            channelData = await channelRes.json();
-          }
         }
         
         let uploadsPlaylistId: string | null = null;
@@ -124,13 +106,28 @@ serve(async (req) => {
           let totalRecentInteractions = 0;
           let totalRecentViews = 0;
 
+          // Save channel ID & title in profile if available and ensure 'yt' is connected
+          const existingConnected: string[] = profile?.connected_platforms || [];
+          const updatedConnected: string[] = existingConnected.includes('yt') ? existingConnected : [...existingConnected, 'yt'];
+          if (item.id || channelTitle) {
+            await supabase.from('profiles').update({
+              connected_platforms: updatedConnected,
+              api_keys: {
+                ...apiKeys,
+                youtube_channel_id: item.id || apiKeys['youtube_channel_id'],
+                yt_channel_id: item.id || apiKeys['yt_channel_id'],
+                youtube_channel_title: channelTitle || apiKeys['youtube_channel_title']
+              }
+            }).eq('id', user.id);
+          }
+
           // 2. Recent Videos & Comments
           if (uploadsPlaylistId) {
-            const playlistUrl = isApiKey
-              ? `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8&key=${encodeURIComponent(rawKeyOrToken)}`
-              : `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8`;
+            const playlistUrl = isOAuth
+              ? `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8`
+              : `https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8&key=${encodeURIComponent(rawKeyOrToken)}`;
             
-            const playlistRes = await fetch(playlistUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+            const playlistRes = await fetch(playlistUrl, isOAuth ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
             const playlistData = await playlistRes.json();
             
             if (playlistData.items && playlistData.items.length > 0) {
@@ -140,16 +137,18 @@ serve(async (req) => {
                 .join(',');
               
               if (videoIds) {
-                const vidStatsUrl = isApiKey
-                  ? `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}&key=${encodeURIComponent(rawKeyOrToken)}`
-                  : `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}`;
+                const vidStatsUrl = isOAuth
+                  ? `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}`
+                  : `https://youtube.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoIds)}&key=${encodeURIComponent(rawKeyOrToken)}`;
                 
-                const vidStatsRes = await fetch(vidStatsUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+                const vidStatsRes = await fetch(vidStatsUrl, isOAuth ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
                 const vidStatsData = await vidStatsRes.json();
                 const statsMap: any = {};
                 if (vidStatsData.items) {
                   vidStatsData.items.forEach((v: any) => { statsMap[v.id] = v; });
                 }
+
+                await supabase.from('content').delete().eq('user_id', user.id).in('platform', ['yt', 'youtube', 'YouTube']);
 
                 for (const plItem of playlistData.items) {
                   const vid = plItem.snippet?.resourceId?.videoId || plItem.contentDetails?.videoId;
@@ -179,11 +178,11 @@ serve(async (req) => {
                   // Fetch 1 recent comment for this video if available
                   if (contentRow && comments > 0) {
                     try {
-                      const commentsUrl = isApiKey
-                        ? `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1&key=${encodeURIComponent(rawKeyOrToken)}`
-                        : `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1`;
+                      const commentsUrl = isOAuth
+                        ? `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1`
+                        : `https://youtube.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(vid)}&maxResults=1&key=${encodeURIComponent(rawKeyOrToken)}`;
                       
-                      const commentsRes = await fetch(commentsUrl, !isApiKey ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
+                      const commentsRes = await fetch(commentsUrl, isOAuth ? { headers: { Authorization: `Bearer ${rawKeyOrToken}` } } : undefined);
                       const commentsData = await commentsRes.json();
                       if (commentsData.items && commentsData.items.length > 0) {
                         const topSnippet = commentsData.items[0].snippet?.topLevelComment?.snippet;
@@ -253,7 +252,8 @@ serve(async (req) => {
           }, { onConflict: 'user_id,platform' });
         }
 
-        if (fbData.feed && fbData.feed.data) {
+        if (fbData.feed && fbData.feed.data && fbData.feed.data.length > 0) {
+          await supabase.from('content').delete().eq('user_id', user.id).in('platform', ['fb', 'facebook', 'Facebook']);
           for (const post of fbData.feed.data) {
             const likes = post.likes?.summary?.total_count || 0;
             const comments = post.comments?.summary?.total_count || 0;
@@ -309,7 +309,8 @@ serve(async (req) => {
                 updated_at: new Date().toISOString()
               }, { onConflict: 'user_id,platform' });
 
-              if (igAccount.media && igAccount.media.data) {
+              if (igAccount.media && igAccount.media.data && igAccount.media.data.length > 0) {
+                 await supabase.from('content').delete().eq('user_id', user.id).in('platform', ['ig', 'instagram', 'Instagram']);
                  for (const media of igAccount.media.data) {
                     const likes = media.like_count || 0;
                     const comments = media.comments_count || 0;
@@ -364,7 +365,8 @@ serve(async (req) => {
             headers: { Authorization: `Bearer ${token}` }
           });
           const tweetsData = await tweetsRes.json();
-          if (tweetsData.data) {
+          if (tweetsData.data && tweetsData.data.length > 0) {
+             await supabase.from('content').delete().eq('user_id', user.id).in('platform', ['x', 'twitter', 'X', 'X (Twitter)']);
              for (const tweet of tweetsData.data) {
                const metrics = tweet.public_metrics;
                await supabase.from('content').insert({

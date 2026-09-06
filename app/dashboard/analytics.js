@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Platform, Image, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { fetchPlatformData, syncPlatformData } from '../../lib/api';
+import { fetchPlatformData, syncPlatformData, normalizePlatformKey } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import ConnectModal from '../../components/ConnectModal';
@@ -33,17 +33,35 @@ export default function AnalyticsScreen() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     
-    const { data: profile } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
-    const { data: { user } } = await supabase.auth.getUser();
-    const identities = user?.identities || session.user?.identities || [];
-    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('connected_platforms, api_keys')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    const identities = session.user?.identities || [];
+    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
     const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
 
-    // Also query analytics rows directly
-    const { data: anRows } = await supabase.from('analytics').select('platform').eq('user_id', session.user.id);
-    const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
+    const profileKeys = profile?.api_keys || {};
+    const keyPlatforms = [];
+    if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
+      keyPlatforms.push('yt');
+    }
 
-    const platforms = Array.from(new Set([...(profile?.connected_platforms || []), ...identityPlatforms, ...anPlatforms]));
+    const { data: anRows } = await supabase
+      .from('analytics')
+      .select('platform')
+      .eq('user_id', session.user.id);
+    const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+    const rawList = [
+      ...(profile?.connected_platforms || []),
+      ...identityPlatforms,
+      ...keyPlatforms,
+      ...anPlatforms
+    ];
+    const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     setConnectedPlatforms(platforms);
     
     const platformData = await fetchPlatformData(platforms);
@@ -56,28 +74,43 @@ export default function AnalyticsScreen() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     let subscription = null;
 
     loadData();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return;
-      subscription = supabase.channel('schema-db-changes')
+      if (!isMounted || !session) return;
+
+      const channelName = `analytics-changes-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase.channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
+          if (isMounted) loadData();
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
-          loadData();
+          if (isMounted) loadData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-          loadData();
+          if (isMounted) loadData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-          loadData();
-        })
-        .subscribe();
+          if (isMounted) loadData();
+        });
+
+      if (!isMounted) {
+        supabase.removeChannel(channel);
+        return;
+      }
+
+      subscription = channel;
+      channel.subscribe();
     });
 
     return () => {
+      isMounted = false;
       if (subscription) {
         supabase.removeChannel(subscription);
+        subscription = null;
       }
     };
   }, [timeframe]);

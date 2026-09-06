@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput, Image } from 'react-native';
 import { Slot, useRouter, usePathname, Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { processSessionOAuthTokens } from '../../lib/api';
+import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 
@@ -22,91 +22,114 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   
+  const fetchActivePlatforms = async (currentSession) => {
+    if (!currentSession) return [];
+    try {
+      const [profileRes, anRes] = await Promise.all([
+        supabase.from('profiles').select('connected_platforms, api_keys').eq('id', currentSession.user.id).maybeSingle(),
+        supabase.from('analytics').select('platform').eq('user_id', currentSession.user.id)
+      ]);
+      const profile = profileRes.data;
+      const anRows = anRes.data || [];
+      const identities = currentSession.user?.identities || [];
+      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+      const apiKeys = profile?.api_keys || {};
+      const keyPlatforms = [];
+      if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
+        keyPlatforms.push('yt');
+      }
+
+      const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+      const rawList = [
+        ...(profile?.connected_platforms || []),
+        ...identityPlatforms,
+        ...keyPlatforms,
+        ...anPlatforms
+      ];
+      return Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
+    } catch (e) {
+      console.warn('Error checking platforms in layout:', e);
+      return [];
+    }
+  };
+
   useEffect(() => {
+    let isMounted = true;
     let realtimeSub = null;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
       if (!session) router.replace('/auth');
       setSession(session);
       if (session) {
-        supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle().then(({ data }) => {
-          if (data?.connected_platforms) setConnectedPlatforms(data.connected_platforms);
-        });
         if (session.provider_token) {
-          processSessionOAuthTokens(session);
+          await processSessionOAuthTokens(session);
+        }
+        const platforms = await fetchActivePlatforms(session);
+        if (isMounted) {
+          setConnectedPlatforms(platforms);
         }
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
       if (!session) {
+        if (realtimeSub) {
+          supabase.removeChannel(realtimeSub);
+          realtimeSub = null;
+        }
         router.replace('/auth');
         return;
       }
       setSession(session);
       
-        // 1. Sync connected_platforms based strictly on Supabase identities (global sync)
-        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).maybeSingle();
-        let newConnected = profile?.connected_platforms || [];
-        
-        // Cleanup any dirty data (full names) that might have been saved previously
-        newConnected = newConnected.map(p => {
-          if (p === 'YouTube') return 'yt';
-          if (p === 'Facebook') return 'fb';
-          if (p === 'Instagram') return 'ig';
-          if (p === 'X (Twitter)') return 'x';
-          if (p === 'LinkedIn') return 'in';
-          return p;
-        });
+      if (session.provider_token) {
+        await processSessionOAuthTokens(session);
+      }
 
-        let profileUpdated = false;
-        const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-        
-        // Fetch fresh user data from server to ensure identities are up-to-date
-        const { data: { user } } = await supabase.auth.getUser();
-        const identities = user?.identities || session.user?.identities || [];
-        
-        identities.forEach(id => {
-           const platformId = providerToPlatformMap[id.provider];
-           if (platformId && !newConnected.includes(platformId)) {
-               newConnected.push(platformId);
-               profileUpdated = true;
-           }
-        });
-        
-        if (profileUpdated) {
-           const { error } = await supabase.from('profiles').update({ connected_platforms: newConnected }).eq('id', session.user.id);
-           if (error) console.error('DEBUG UPDATE ERROR:', error);
+      const platforms = await fetchActivePlatforms(session);
+      if (isMounted) setConnectedPlatforms(platforms);
+
+      if (!isMounted) return;
+
+      // Realtime listener for profile and analytics updates
+      if (!realtimeSub) {
+        const channelName = `layout-profile-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const channel = supabase.channel(channelName)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, async () => {
+            if (isMounted) {
+              const updated = await fetchActivePlatforms(session);
+              if (isMounted) setConnectedPlatforms(updated);
+            }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, async () => {
+            if (isMounted) {
+              const updated = await fetchActivePlatforms(session);
+              if (isMounted) setConnectedPlatforms(updated);
+            }
+          });
+
+        if (!isMounted) {
+          supabase.removeChannel(channel);
+          return;
         }
 
-        setConnectedPlatforms(newConnected);
-
-        // 2. Handle provider token capture if available
-        if (session.provider_token) {
-          await processSessionOAuthTokens(session);
-          const { data: p } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
-          if (p?.connected_platforms) setConnectedPlatforms(p.connected_platforms);
-        }
-
-        // 3. Realtime listener for profile and analytics updates
-        if (!realtimeSub) {
-          realtimeSub = supabase.channel('layout-profile-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, (payload) => {
-              if (payload.new?.connected_platforms) {
-                setConnectedPlatforms(payload.new.connected_platforms);
-              }
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, async () => {
-              const { data: p } = await supabase.from('profiles').select('connected_platforms').eq('id', session.user.id).maybeSingle();
-              if (p?.connected_platforms) setConnectedPlatforms(p.connected_platforms);
-            })
-            .subscribe();
-        }
+        realtimeSub = channel;
+        channel.subscribe();
+      }
     });
 
     return () => {
-      subscription.unsubscribe();
-      if (realtimeSub) supabase.removeChannel(realtimeSub);
+      isMounted = false;
+      subscription?.unsubscribe?.();
+      if (realtimeSub) {
+        supabase.removeChannel(realtimeSub);
+        realtimeSub = null;
+      }
     };
   }, []);
 
@@ -123,9 +146,11 @@ export default function DashboardLayout() {
       <View style={styles.topbar}>
         <View style={styles.topbarLeft}>
           <View style={styles.brandRow}>
-            <View style={styles.brandIcon}>
-              <Text style={styles.brandIconText}>⟁</Text>
-            </View>
+            <Image
+              source={require('../../assets/logo-mark.png')}
+              style={styles.brandIcon}
+              resizeMode="contain"
+            />
             <View>
               <Text style={styles.brandName}>StreamSync</Text>
               <Text style={styles.brandTag}>Creator Hub</Text>
@@ -183,10 +208,7 @@ export default function DashboardLayout() {
               { id: 'fb', name: 'Facebook', color: '#1877F2' },
               { id: 'in', name: 'LinkedIn', color: '#0A66C2' },
             ].map((p) => {
-              const isSynced = connectedPlatforms.some(cp => {
-                const low = String(cp).toLowerCase();
-                return low === p.id || low === p.name.toLowerCase() || (p.id === 'yt' && (low === 'youtube' || low === 'yt'));
-              });
+              const isSynced = connectedPlatforms.some(cp => isPlatformMatch(cp, p.id));
 
               return (
                 <View key={p.name} style={styles.platformRow}>
@@ -277,17 +299,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   brandIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  brandIconText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
+    width: 32,
+    height: 32,
   },
   brandName: {
     fontSize: 16,

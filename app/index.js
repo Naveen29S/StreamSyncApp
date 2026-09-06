@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
 import { Link } from 'expo-router';
 import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
 
@@ -16,9 +16,11 @@ export default function App() {
       {/* ─── Top Navigation ─── */}
       <View style={styles.navBar}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoIconText}>⟁</Text>
-          </View>
+          <Image
+            source={require('../assets/logo-mark.png')}
+            style={styles.logoIcon}
+            resizeMode="contain"
+          />
           <Text style={styles.brandName}>StreamSync</Text>
         </View>
 
@@ -135,9 +137,11 @@ export default function App() {
       <View style={styles.footer}>
         <View style={styles.footerInner}>
           <View style={styles.footerBrand}>
-            <View style={styles.logoIcon}>
-              <Text style={styles.logoIconText}>⟁</Text>
-            </View>
+            <Image
+              source={require('../assets/logo-mark.png')}
+              style={styles.logoIcon}
+              resizeMode="contain"
+            />
             <Text style={styles.footerBrandName}>StreamSync</Text>
           </View>
           <Text style={styles.footerText}>© 2026 StreamSync. All rights reserved.</Text>
@@ -176,10 +180,9 @@ const styles = StyleSheet.create({
   },
   logoContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoIcon: {
-    width: 32, height: 32, borderRadius: 8,
-    backgroundColor: '#000', justifyContent: 'center', alignItems: 'center',
+    width: 36,
+    height: 36,
   },
-  logoIconText: { fontSize: 16, color: '#fff', fontWeight: 'bold' },
   brandName: { fontSize: 20, fontWeight: '700', color: '#000', letterSpacing: -0.3 },
   navLinks: { flexDirection: 'row', gap: 28 },
   navLink: { fontSize: 14, color: '#666', fontWeight: '500' },

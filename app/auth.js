@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Dimensions, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Dimensions, Alert, Image, Linking } from 'react-native';
 import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInUp, FadeIn, Layout } from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,41 @@ export default function AuthScreen() {
     setPasswordError('');
     setDob('');
   };
+
+  async function handleGoogleSignIn() {
+    setPasswordError('');
+    setLoading(true);
+    try {
+      await AsyncStorage.setItem('pending_connection', 'yt');
+      const redirectUri = Platform.OS === 'web' ? (window.location.origin + '/dashboard') : undefined;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/youtube.readonly',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account consent',
+          },
+          redirectTo: redirectUri,
+        },
+      });
+
+      if (error) {
+        Alert.alert('Google Sign-In Error', error.message);
+        setLoading(false);
+      } else if (data?.url) {
+        if (Platform.OS === 'web') {
+          window.location.href = data.url;
+        } else {
+          Linking.openURL(data.url);
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      Alert.alert('Sign-In Error', err.message || 'Failed to initiate Google sign in');
+      setLoading(false);
+    }
+  }
 
   async function handleAuthentication() {
     setPasswordError('');
@@ -97,10 +133,12 @@ export default function AuthScreen() {
 
       {/* Brand */}
       <Animated.View entering={FadeInUp.duration(600)} style={styles.brandRow}>
-        <View style={styles.brandIcon}>
-          <Text style={styles.brandIconText}>⟁</Text>
-        </View>
-        <Text style={styles.brandName}>StreamSync</Text>
+        <Image
+          source={require('../assets/logo-mark.png')}
+          style={styles.authLogoIcon}
+          resizeMode="contain"
+        />
+        <Text style={styles.authBrandName}>StreamSync</Text>
       </Animated.View>
 
       {/* Auth Card */}
@@ -111,6 +149,26 @@ export default function AuthScreen() {
         <Animated.Text layout={Layout.springify()} style={styles.subtitle}>
           {isSignUp ? 'Join StreamSync and sync your platforms.' : 'Sign in to your creator hub.'}
         </Animated.Text>
+
+        {/* Continue with Google */}
+        <TouchableOpacity 
+          style={styles.googleButton} 
+          onPress={handleGoogleSignIn} 
+          disabled={loading}
+        >
+          <Image 
+            source={{ uri: 'https://img.icons8.com/color/512/google-logo.png' }} 
+            style={styles.googleIcon} 
+            resizeMode="contain" 
+          />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>EMAIL</Text>
@@ -229,17 +287,17 @@ const styles = StyleSheet.create({
     fontSize: 13, fontWeight: '500', color: '#666',
   },
   brandRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 32,
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 32,
   },
-  brandIcon: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: '#000',
-    justifyContent: 'center', alignItems: 'center',
+  authLogoIcon: {
+    width: 42,
+    height: 42,
   },
-  brandIconText: {
-    fontSize: 18, color: '#fff', fontWeight: 'bold',
-  },
-  brandName: {
-    fontSize: 22, fontWeight: '700', color: '#000', letterSpacing: -0.3,
+  authBrandName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -0.4,
   },
   authCard: {
     width: '100%', maxWidth: 400, backgroundColor: '#fff', padding: 36,
@@ -290,5 +348,45 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     color: '#000', fontSize: 14, fontWeight: '700',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    borderRadius: 999,
+    paddingVertical: 14,
+    marginBottom: 20,
+    gap: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+  },
+  googleButtonText: {
+    color: '#1f2937',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#eee',
+  },
+  dividerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#999',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   },
 });

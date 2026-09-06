@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { fetchPlatformData, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, normalizePlatformName, processSessionOAuthTokens } from '../../lib/api';
 import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORMS = {
@@ -69,32 +69,15 @@ export default function DashboardIndex() {
     
     const { data: profile } = await supabase
       .from('profiles')
-      .select('connected_platforms')
+      .select('connected_platforms, api_keys')
       .eq('id', session.user.id)
       .maybeSingle();
-      
-    const { data: { user } } = await supabase.auth.getUser();
-    const identities = user?.identities || session.user?.identities || [];
-    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
 
-    // Also check if analytics has any connected platforms recorded
-    const { data: anRows } = await supabase
-      .from('analytics')
-      .select('platform')
-      .eq('user_id', session.user.id);
-    const anPlatforms = (anRows || []).map(r => r.platform).filter(Boolean);
-
-    // Combine profile platforms, identity platforms, and analytics records
-    const platforms = Array.from(new Set([
-      ...(profile?.connected_platforms || []),
-      ...identityPlatforms,
-      ...anPlatforms
-    ]));
+    const platforms = (profile?.connected_platforms || []).map(p => normalizePlatformKey(p)).filter(Boolean);
     
     setConnectedPlatforms(platforms);
     
-    // 1. Fetch current cached DB data immediately so UI isn't blocked
+    // Fetch current DB data immediately so UI isn't blocked
     const apiData = await fetchPlatformData(platforms);
     setData(apiData);
     setLoading(false);
@@ -102,38 +85,73 @@ export default function DashboardIndex() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     let subscription = null;
+
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+      if (session) {
+        await reloadDashboardData();
+      } else {
+        setLoading(false);
+      }
+    });
 
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        if (isMounted) setLoading(false);
+        return;
+      }
+      if (!isMounted) return;
 
       const platforms = await reloadDashboardData();
+      if (!isMounted) return;
 
-      // 2. Trigger background sync via Edge Function & direct API
+      // 2. Trigger background sync via direct API & Edge function
       if (platforms && platforms.length > 0) {
-        syncPlatformData(platforms);
+        syncPlatformData(platforms).then(synced => {
+          if (synced && isMounted) {
+            reloadDashboardData();
+          }
+        });
       }
 
-      // 3. Realtime updates listener
-      subscription = supabase.channel('dashboard-realtime')
+      if (!isMounted) return;
+
+      // 3. Realtime updates listener with unique channel name
+      const channelName = `dashboard-realtime-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase.channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
+          if (isMounted) reloadDashboardData();
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
-          reloadDashboardData();
+          if (isMounted) reloadDashboardData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-          reloadDashboardData();
+          if (isMounted) reloadDashboardData();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-          reloadDashboardData();
-        })
-        .subscribe();
+          if (isMounted) reloadDashboardData();
+        });
+
+      if (!isMounted) {
+        supabase.removeChannel(channel);
+        return;
+      }
+
+      subscription = channel;
+      channel.subscribe();
     };
     
     init();
 
     return () => {
+      isMounted = false;
+      authListener?.unsubscribe?.();
       if (subscription) {
         supabase.removeChannel(subscription);
+        subscription = null;
       }
     };
   }, []);
@@ -142,7 +160,11 @@ export default function DashboardIndex() {
     return (
       <View style={styles.loadingWrap}>
         <View style={styles.loadingPulse}>
-          <Text style={styles.loadingIcon}>⟁</Text>
+          <Image
+            source={require('../../assets/logo-mark.png')}
+            style={styles.loadingIcon}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.loadingText}>Syncing your platforms...</Text>
         <Text style={styles.loadingSub}>Pulling data from connected accounts</Text>
@@ -176,13 +198,11 @@ export default function DashboardIndex() {
           </TouchableOpacity>
         ) : (
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {connectedPlatforms.map(platformId => {
-              const platformMap = { 'yt': 'YouTube', 'ig': 'Instagram', 'x': 'X (Twitter)', 'fb': 'Facebook', 'in': 'LinkedIn' };
-              const name = platformMap[platformId] || platformId;
+            {Array.from(new Set(connectedPlatforms.map(p => normalizePlatformName(p) || p))).map(name => {
               const config = PLATFORMS[name];
               if (!config) return null;
               return (
-                <View key={platformId} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: config.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: config.color + '30' }}>
+                <View key={name} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: config.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: config.color + '30' }}>
                   <Image source={{ uri: config.logo }} style={{ width: 14, height: 14 }} resizeMode="contain" />
                 </View>
               );
@@ -251,9 +271,10 @@ export default function DashboardIndex() {
       <View style={styles.platformGrid}>
         {Object.entries(PLATFORMS).map(([name, config]) => {
           const dbKeyMap = { 'YouTube': 'yt', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
-          const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, dbKeyMap[name]));
-          const stats = data?.platformStats?.[name];
+          const pKey = dbKeyMap[name] || normalizePlatformKey(name);
+          const stats = data?.platformStats?.[name] || data?.platformStats?.[pKey];
           const hasApiData = Boolean(stats && (stats.rawFollowers !== undefined || stats.rawViews !== undefined));
+          const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, pKey)) || hasApiData;
           
           let statusText = 'Not connected';
           let dotStyle = styles.statusDotOff;
@@ -302,21 +323,21 @@ export default function DashboardIndex() {
                 <View style={styles.platformMetrics}>
                   <View style={styles.platformMetricItem}>
                     <Text style={styles.platformMetricVal}>
-                      {data.platformStats?.[name]?.followers || '0'}
+                      {stats?.followers || '0'}
                     </Text>
                     <Text style={styles.platformMetricLabel}>Followers</Text>
                   </View>
                   <View style={styles.platformMetricDivider} />
                   <View style={styles.platformMetricItem}>
                     <Text style={styles.platformMetricVal}>
-                      {data.platformStats?.[name]?.views || '0'}
+                      {stats?.views || '0'}
                     </Text>
                     <Text style={styles.platformMetricLabel}>Views</Text>
                   </View>
                   <View style={styles.platformMetricDivider} />
                   <View style={styles.platformMetricItem}>
                     <Text style={styles.platformMetricVal}>
-                      {data.platformStats?.[name]?.engage || '0.0%'}
+                      {stats?.engage || '0.0%'}
                     </Text>
                     <Text style={styles.platformMetricLabel}>Engage</Text>
                   </View>
@@ -358,17 +379,34 @@ export default function DashboardIndex() {
           });
 
           if (filteredContent.length === 0) {
+            const isAnyConnected = connectedPlatforms.length > 0;
+            const isTabConnected = activeTab === 'all' 
+              ? isAnyConnected 
+              : connectedPlatforms.some(p => isPlatformMatch(p, activeTab));
+
             return (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>◫</Text>
                 <Text style={styles.emptyTitle}>
-                  {activeTab === 'all' ? 'No content synced yet' : `No ${activeTab} content synced yet`}
+                  {activeTab === 'all'
+                    ? (isAnyConnected ? 'No content published yet' : 'No content synced yet')
+                    : (isTabConnected ? `No ${activeTab} content published yet` : `No ${activeTab} content synced yet`)}
                 </Text>
                 <Text style={styles.emptySub}>
                   {activeTab === 'all'
-                    ? 'Connect your platforms above to start seeing your content here.'
-                    : `Connect your ${activeTab} account in Platforms to start seeing your posts here.`}
+                    ? (isAnyConnected ? 'Your connected accounts are active. Videos or posts will appear here once published.' : 'Connect your platforms above to start seeing your content here.')
+                    : (isTabConnected ? `Your ${activeTab} account is connected. New uploads will sync and appear here automatically.` : `Connect your ${activeTab} account in Platforms to start seeing your posts here.`)}
                 </Text>
+                {!isTabConnected && (
+                  <TouchableOpacity 
+                    style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#f0f2f5', borderRadius: 8 }}
+                    onPress={() => openConnectModal(activeTab === 'all' ? 'YouTube' : activeTab)}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#111' }}>
+                      + Connect {activeTab === 'all' ? 'Channel' : activeTab}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           }
@@ -497,12 +535,17 @@ const styles = StyleSheet.create({
   // ─── Loading ───
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingPulse: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    width: 64, height: 64, borderRadius: 18,
+    backgroundColor: '#fff',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 8,
+    borderWidth: 1, borderColor: '#eee',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10,
   },
-  loadingIcon: { fontSize: 28, color: '#000' },
+  loadingIcon: {
+    width: 38,
+    height: 38,
+  },
   loadingText: { fontSize: 16, color: '#000', fontWeight: '600' },
   loadingSub: { fontSize: 13, color: '#666' },
 

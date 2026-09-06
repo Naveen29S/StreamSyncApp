@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Image, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { normalizePlatformName, syncPlatformData } from '../../lib/api';
+import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import ConnectModal from '../../components/ConnectModal';
 
@@ -31,6 +31,7 @@ function formatRelativeTime(dateStr) {
 export default function CommentsScreen() {
   const router = useRouter();
   const [comments, setComments] = useState([]);
+  const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
@@ -45,6 +46,44 @@ export default function CommentsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('connected_platforms, api_keys')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const identities = session.user?.identities || [];
+      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+      const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+      const profileKeys = profile?.api_keys || {};
+      const keyPlatforms = [];
+      if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
+        keyPlatforms.push('yt');
+      }
+
+      const { data: anRows } = await supabase
+        .from('analytics')
+        .select('platform')
+        .eq('user_id', session.user.id);
+      const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+      const rawList = [
+        ...(profile?.connected_platforms || []),
+        ...identityPlatforms,
+        ...keyPlatforms,
+        ...anPlatforms
+      ];
+      const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
+      setConnectedPlatforms(platforms);
+
+      if (platforms.length === 0) {
+        setComments([]);
+        setActiveId(null);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('comments')
         .select('*, content(title, platform)')
@@ -53,25 +92,31 @@ export default function CommentsScreen() {
 
       if (error) throw error;
 
-      const mapped = (data || []).map((c, index) => {
-        const platformName = normalizePlatformName(c.content?.platform || 'YouTube');
-        return {
-          id: c.id,
-          user: c.author_name || 'YouTube Viewer',
-          avatar: c.author_avatar || null,
-          platform: platformName,
-          videoTitle: c.content?.title || 'YouTube Upload',
-          color: PLATFORM_COLORS[platformName] || '#FF0000',
-          text: c.text || '',
-          time: formatRelativeTime(c.created_at),
-          unread: index < 2,
-          createdAt: c.created_at
-        };
-      });
+      const mapped = (data || [])
+        .filter(c => connectedPlatforms.includes(normalizePlatformKey(c.content?.platform || 'yt')))
+        .map((c, index) => {
+          const platformName = normalizePlatformName(c.content?.platform || 'YouTube');
+          return {
+            id: c.id,
+            user: c.author_name || 'YouTube Viewer',
+            avatar: c.author_avatar || null,
+            platform: platformName,
+            videoTitle: c.content?.title || 'YouTube Upload',
+            color: PLATFORM_COLORS[platformName] || '#FF0000',
+            text: c.text || '',
+            time: formatRelativeTime(c.created_at),
+            unread: index < 2,
+            createdAt: c.created_at
+          };
+        });
 
       setComments(mapped);
-      if (mapped.length > 0 && !activeId) {
-        setActiveId(mapped[0].id);
+      if (mapped.length > 0) {
+        if (!activeId || !mapped.some(m => m.id === activeId)) {
+          setActiveId(mapped[0].id);
+        }
+      } else {
+        setActiveId(null);
       }
     } catch (err) {
       console.warn("Failed to load comments:", err.message);
@@ -81,27 +126,46 @@ export default function CommentsScreen() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    let subscription = null;
+
     loadComments();
 
-    let subscription = null;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        subscription = supabase.channel('comments-db-sync')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-            loadComments();
-          })
-          .subscribe();
+      if (!isMounted || !session) return;
+
+      const channelName = `comments-db-sync-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const channel = supabase.channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
+          if (isMounted) loadComments();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
+          if (isMounted) loadComments();
+        });
+
+      if (!isMounted) {
+        supabase.removeChannel(channel);
+        return;
       }
+
+      subscription = channel;
+      channel.subscribe();
     });
 
     return () => {
-      if (subscription) supabase.removeChannel(subscription);
+      isMounted = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+        subscription = null;
+      }
     };
   }, []);
 
   const handleSyncComments = async () => {
     setSyncing(true);
-    await syncPlatformData(['yt']);
+    if (connectedPlatforms.length > 0) {
+      await syncPlatformData(connectedPlatforms);
+    }
     await loadComments();
     setSyncing(false);
   };
@@ -179,14 +243,26 @@ export default function CommentsScreen() {
               <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#000', marginBottom: 4 }}>No Comments Found</Text>
               <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
-                Connect your YouTube channel to view audience comments.
+                {connectedPlatforms.includes('yt')
+                  ? 'Your YouTube channel is connected. Comments from viewers will appear here when posted on your videos.'
+                  : 'Connect your YouTube channel to view audience comments.'}
               </Text>
-              <TouchableOpacity 
-                style={styles.connectLinkBtn}
-                onPress={() => setConnectModalVisible(true)}
-              >
-                <Text style={styles.connectLinkText}>Connect YouTube →</Text>
-              </TouchableOpacity>
+              {connectedPlatforms.includes('yt') ? (
+                <TouchableOpacity 
+                  style={styles.connectLinkBtn}
+                  onPress={handleSyncComments}
+                  disabled={syncing}
+                >
+                  <Text style={styles.connectLinkText}>{syncing ? 'Syncing...' : '↻ Refresh Comments'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.connectLinkBtn}
+                  onPress={() => setConnectModalVisible(true)}
+                >
+                  <Text style={styles.connectLinkText}>Connect YouTube →</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <ScrollView>

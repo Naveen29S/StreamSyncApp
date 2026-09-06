@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { fetchPlatformData, syncPlatformData, isPlatformMatch, connectYouTubeViaApiKey, disconnectPlatform } from '../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, disconnectPlatform } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PLATFORMS = {
@@ -19,7 +19,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [session, setSession] = useState(null);
 
   // YouTube modal states
-  const [ytTab, setYtTab] = useState('apikey'); // 'apikey' | 'oauth'
+  const [ytTab, setYtTab] = useState('oauth'); // 'oauth' | 'apikey'
   const [ytApiKey, setYtApiKey] = useState('');
   const [ytChannelId, setYtChannelId] = useState('');
   const [ytLoading, setYtLoading] = useState(false);
@@ -42,33 +42,55 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       .eq('id', currentSession.user.id)
       .maybeSingle();
 
-    if (profile?.api_keys) {
-      setApiKeys(profile.api_keys);
-      const rawKey = typeof profile.api_keys.youtube === 'object'
-        ? (profile.api_keys.youtube.apiKey || profile.api_keys.youtube.token || '')
-        : (profile.api_keys.youtube || profile.api_keys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
-      const rawChan = profile.api_keys.youtube_channel_id || profile.api_keys.yt_channel_id || (typeof profile.api_keys.youtube === 'object' ? profile.api_keys.youtube.channelId : '') || '';
-      if (rawKey) setYtApiKey(rawKey);
-      if (rawChan) setYtChannelId(rawChan);
-    } else {
-      setYtChannelId('@GoogleDevelopers');
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const identities = user?.identities || currentSession.user?.identities || [];
-    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
+    const identities = currentSession.user?.identities || [];
+    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
     const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
 
-    const platforms = Array.from(new Set([
+    const apiKeys = profile?.api_keys || {};
+    const keyPlatforms = [];
+    if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
+      keyPlatforms.push('yt');
+    }
+
+    const { data: anRows } = await supabase
+      .from('analytics')
+      .select('platform')
+      .eq('user_id', currentSession.user.id);
+    const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+    const rawList = [
       ...(profile?.connected_platforms || []),
       ...identityPlatforms,
-    ]));
+      ...keyPlatforms,
+      ...anPlatforms
+    ];
+    const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     setConnectedPlatforms(platforms);
+
+    if (profile?.api_keys) {
+      setApiKeys(profile.api_keys);
+      const isYtConnected = platforms.includes('yt');
+      if (isYtConnected) {
+        const rawKey = typeof profile.api_keys.youtube === 'object'
+          ? (profile.api_keys.youtube.apiKey || profile.api_keys.youtube.token || '')
+          : (profile.api_keys.youtube || profile.api_keys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
+        const rawChan = profile.api_keys.youtube_channel_id || profile.api_keys.yt_channel_id || (typeof profile.api_keys.youtube === 'object' ? profile.api_keys.youtube.channelId : '') || '';
+        if (rawKey) setYtApiKey(rawKey);
+        if (rawChan) setYtChannelId(rawChan);
+      } else {
+        setYtApiKey('');
+        setYtChannelId('');
+      }
+    } else {
+      setYtApiKey('');
+      setYtChannelId('');
+    }
   };
 
   useEffect(() => {
     if (visible) {
       setSelectedPlatform(initialPlatform || 'YouTube');
+      setYtTab('oauth');
       setModalError('');
       setModalSuccess('');
       setYtModalError('');
@@ -142,15 +164,24 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setModalError('');
     setYtModalError('');
     try {
+      // Optimistically clear local state immediately
+      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, platformKey)));
+      if (platformKey === 'yt') {
+        setYtApiKey('');
+        setYtChannelId('');
+      }
+
       await disconnectPlatform(platformKey);
       await loadData();
-      if (onSuccess) await onSuccess();
+      if (onSuccess) {
+        await onSuccess();
+      }
       setModalSuccess('Platform disconnected.');
       setYtModalSuccess('Platform disconnected.');
       setTimeout(() => {
         setModalSuccess('');
         setYtModalSuccess('');
-      }, 1200);
+      }, 1000);
     } catch (e) {
       const msg = e.message || 'Failed to disconnect';
       setModalError(msg);
@@ -212,15 +243,29 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/dashboard';
       const redirectUri = Platform.OS === 'web' ? (window.location.origin + currentPath) : undefined;
 
-      const { data, error } = await authMethod.call(supabase.auth, {
+      const oauthOptions = {
+        scopes: scopes ? scopes : undefined,
+        redirectTo: redirectUri,
+        queryParams: platformKey === 'yt' ? { access_type: 'offline', prompt: 'select_account consent' } : undefined,
+      };
+
+      let { data, error } = await authMethod.call(supabase.auth, {
         provider: provider,
-        options: {
-          scopes: scopes ? scopes : undefined,
-          redirectTo: redirectUri
-        }
+        options: oauthOptions
       });
+
+      if (error && authMethod === supabase.auth.linkIdentity && 
+          (error.message?.includes('already') || error.code === 'identity_already_exists')) {
+        const retry = await supabase.auth.signInWithOAuth({
+          provider: provider,
+          options: oauthOptions
+        });
+        data = retry.data;
+        error = retry.error;
+      }
       
       if (error) {
+        await AsyncStorage.removeItem('pending_connection').catch(() => {});
         setModalError(error.message);
         setYtModalError(error.message);
         setActionLoading(false);
@@ -323,19 +368,19 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                 </View>
               )}
 
-              {/* Subtabs for YouTube: API Key / OAuth */}
+              {/* Subtabs for YouTube: OAuth / API Key */}
               <View style={styles.modalTabs}>
+                <TouchableOpacity 
+                  style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
+                  onPress={() => setYtTab('oauth')}
+                >
+                  <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth (Recommended)</Text>
+                </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.modalTabBtn, ytTab === 'apikey' && styles.modalTabBtnActive]}
                   onPress={() => setYtTab('apikey')}
                 >
                   <Text style={[styles.modalTabText, ytTab === 'apikey' && styles.modalTabTextActive]}>YouTube API Key</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
-                  onPress={() => setYtTab('oauth')}
-                >
-                  <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth</Text>
                 </TouchableOpacity>
               </View>
 

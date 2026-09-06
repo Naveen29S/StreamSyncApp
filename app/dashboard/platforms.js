@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated, Modal, TextInput, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { connectYouTubeViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, processSessionOAuthTokens } from '../../lib/api';
+import { connectYouTubeViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, normalizePlatformKey, processSessionOAuthTokens } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
@@ -63,7 +63,7 @@ export default function ConnectsScreen() {
 
   // YouTube modal states
   const [ytModalVisible, setYtModalVisible] = useState(false);
-  const [ytTab, setYtTab] = useState('apikey'); // 'apikey' | 'oauth'
+  const [ytTab, setYtTab] = useState('oauth'); // 'oauth' | 'apikey'
   const [ytApiKey, setYtApiKey] = useState('');
   const [ytChannelId, setYtChannelId] = useState('');
   const [ytLoading, setYtLoading] = useState(false);
@@ -114,7 +114,9 @@ export default function ConnectsScreen() {
       if (session) {
         fetchProfile(session.user.id);
         if (session.provider_token) {
-          processSessionOAuthTokens(session);
+          processSessionOAuthTokens(session).then(() => {
+            fetchProfile(session.user.id);
+          });
         }
       }
     });
@@ -122,35 +124,10 @@ export default function ConnectsScreen() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-        await fetchProfile(session.user.id);
-        
-        // 1. Sync connected_platforms based on identities
-        const { data: profile } = await supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).maybeSingle();
-        let newConnected = profile?.connected_platforms || [];
-        let profileUpdated = false;
-        
-        const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in' };
-        const { data: { user } } = await supabase.auth.getUser();
-        const identities = user?.identities || session.user?.identities || [];
-        
-        identities.forEach(id => {
-           const platformId = providerToPlatformMap[id.provider];
-           if (platformId && !newConnected.includes(platformId)) {
-               newConnected.push(platformId);
-               profileUpdated = true;
-           }
-        });
-        
-        if (profileUpdated) {
-           await supabase.from('profiles').upsert({ id: session.user.id, connected_platforms: newConnected }, { onConflict: 'id' });
-           setConnectedPlatforms(newConnected);
-        }
-
-        // 2. Handle provider token capture if available
         if (session.provider_token) {
           await processSessionOAuthTokens(session);
-          await fetchProfile(session.user.id);
         }
+        await fetchProfile(session.user.id);
       } else {
         router.replace('/auth');
       }
@@ -166,23 +143,56 @@ export default function ConnectsScreen() {
       .eq('id', userId)
       .maybeSingle();
 
-    if (data?.connected_platforms) {
-      setConnectedPlatforms(data.connected_platforms);
+    const { data: { user } } = await supabase.auth.getUser();
+    const identities = user?.identities || session?.user?.identities || [];
+    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+
+    const profileKeys = data?.api_keys || {};
+    const keyPlatforms = [];
+    if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
+      keyPlatforms.push('yt');
     }
+
+    const { data: anRows } = await supabase
+      .from('analytics')
+      .select('platform')
+      .eq('user_id', userId);
+    const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+    const rawList = [
+      ...(data?.connected_platforms || []),
+      ...identityPlatforms,
+      ...keyPlatforms,
+      ...anPlatforms
+    ];
+    const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
+    setConnectedPlatforms(platforms);
+
     if (data?.api_keys) {
       setApiKeys(data.api_keys);
-      const rawKey = typeof data.api_keys.youtube === 'object'
-        ? (data.api_keys.youtube.apiKey || data.api_keys.youtube.token || '')
-        : (data.api_keys.youtube || data.api_keys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
-      const rawChan = data.api_keys.youtube_channel_id || data.api_keys.yt_channel_id || (typeof data.api_keys.youtube === 'object' ? data.api_keys.youtube.channelId : '') || '';
-      if (rawKey) setYtApiKey(rawKey);
-      if (rawChan) setYtChannelId(rawChan);
+      const isYt = platforms.includes('yt');
+      if (isYt) {
+        const rawKey = typeof data.api_keys.youtube === 'object'
+          ? (data.api_keys.youtube.apiKey || data.api_keys.youtube.token || '')
+          : (data.api_keys.youtube || data.api_keys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
+        const rawChan = data.api_keys.youtube_channel_id || data.api_keys.yt_channel_id || (typeof data.api_keys.youtube === 'object' ? data.api_keys.youtube.channelId : '') || '';
+        if (rawKey) setYtApiKey(rawKey);
+        if (rawChan) setYtChannelId(rawChan);
+      } else {
+        setYtApiKey('');
+        setYtChannelId('');
+      }
+    } else {
+      setYtApiKey('');
+      setYtChannelId('');
     }
   }
 
   function openYtModal() {
     setYtModalError('');
     setYtModalSuccess('');
+    setYtTab('oauth');
     const rawKey = typeof apiKeys.youtube === 'object'
       ? (apiKeys.youtube.apiKey || apiKeys.youtube.token || '')
       : (apiKeys.youtube || apiKeys.yt || process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || '');
@@ -251,10 +261,13 @@ export default function ConnectsScreen() {
   async function handleDisconnectYt() {
     setYtLoading(true);
     try {
-      await disconnectPlatform('yt');
-      await fetchProfile(session.user.id);
+      // Optimistically clear local state immediately
+      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, 'yt')));
       setYtApiKey('');
       setYtChannelId('');
+
+      await disconnectPlatform('yt');
+      await fetchProfile(session.user.id);
       setYtModalVisible(false);
     } catch (e) {
       setYtModalError(e.message || 'Failed to disconnect');
@@ -266,9 +279,12 @@ export default function ConnectsScreen() {
   async function handleDisconnectPlatform(platformId) {
     if (!session) return;
     try {
+      // Optimistically clear local state immediately
+      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, platformId)));
+      setManagePlatform(null);
+
       await disconnectPlatform(platformId);
       await fetchProfile(session.user.id);
-      setManagePlatform(null);
     } catch (e) {
       alert('Failed to disconnect: ' + (e.message || 'Unknown error'));
     }
@@ -318,14 +334,32 @@ export default function ConnectsScreen() {
       const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformId));
       const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
 
-      const { data, error } = await authMethod.call(supabase.auth, {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/dashboard/platforms';
+      const redirectUri = Platform.OS === 'web' ? (window.location.origin + currentPath) : undefined;
+
+      const oauthOptions = {
+        scopes: scopes ? scopes : undefined,
+        redirectTo: redirectUri,
+        queryParams: platformId === 'yt' ? { access_type: 'offline', prompt: 'select_account consent' } : undefined,
+      };
+
+      let { data, error } = await authMethod.call(supabase.auth, {
         provider: provider,
-        options: {
-          scopes: scopes ? scopes : undefined,
-          redirectTo: Platform.OS === 'web' ? (window.location.origin + (typeof window !== 'undefined' ? window.location.pathname : '/dashboard/platforms')) : undefined
-        }
+        options: oauthOptions
       });
+
+      if (error && authMethod === supabase.auth.linkIdentity && 
+          (error.message?.includes('already') || error.code === 'identity_already_exists')) {
+        const retry = await supabase.auth.signInWithOAuth({
+          provider: provider,
+          options: oauthOptions
+        });
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) {
+        await AsyncStorage.removeItem('pending_connection').catch(() => {});
         console.warn('OAuth Error:', error.message);
         setConnectError(error.message);
         setSyncing(null);
@@ -502,16 +536,16 @@ export default function ConnectsScreen() {
             {/* Tab Selection */}
             <View style={styles.modalTabs}>
               <TouchableOpacity 
+                style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
+                onPress={() => setYtTab('oauth')}
+              >
+                <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth (Recommended)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
                 style={[styles.modalTabBtn, ytTab === 'apikey' && styles.modalTabBtnActive]}
                 onPress={() => setYtTab('apikey')}
               >
                 <Text style={[styles.modalTabText, ytTab === 'apikey' && styles.modalTabTextActive]}>YouTube API Key</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
-                onPress={() => setYtTab('oauth')}
-              >
-                <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth</Text>
               </TouchableOpacity>
             </View>
 
