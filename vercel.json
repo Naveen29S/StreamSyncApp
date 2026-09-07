@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "expo export -p web",
   "outputDirectory": "dist",
   "rewrites": [
     {
@@ -9,6 +9,10 @@
     {
       "source": "/terms",
       "destination": "/terms.html"
+    },
+    {
+      "source": "/google01b7a301b7069c9f.html",
+      "destination": "/google01b7a301b7069c9f.html"
     },
     {
       "source": "/(.*)",

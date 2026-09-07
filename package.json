@@ -26,8 +26,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "build": "expo export -p web && node scripts/post-export.js",
-    "postbuild": "node scripts/post-export.js",
+    "build": "expo export -p web",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
