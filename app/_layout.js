@@ -33,6 +33,13 @@ export default function Layout() {
           html, body, #root, div, span, p, a, input, button, textarea { font-family: 'Quicksand-SemiBold', sans-serif; }
         `));
         document.head.appendChild(style);
+
+        if (!document.querySelector('meta[name="google-site-verification"]')) {
+          const meta = document.createElement('meta');
+          meta.name = 'google-site-verification';
+          meta.content = 'oaY7rCATj3dutsVQXqy0twqfVPPuNcZni0PUPe8v1QI';
+          document.head.appendChild(meta);
+        }
       }
     }
   }, [fontsLoaded]);
