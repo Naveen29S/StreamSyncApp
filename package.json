@@ -26,7 +26,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "build": "expo export -p web",
+    "build": "expo export -p web && node scripts/inject-tags.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
