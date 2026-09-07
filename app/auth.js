@@ -13,6 +13,8 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
   const [dob, setDob] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -22,11 +24,15 @@ export default function AuthScreen() {
     setEmail('');
     setPassword('');
     setPasswordError('');
+    setAuthError('');
+    setAuthSuccess('');
     setDob('');
   };
 
   async function handleGoogleSignIn() {
     setPasswordError('');
+    setAuthError('');
+    setAuthSuccess('');
     setLoading(true);
     try {
       await AsyncStorage.setItem('pending_connection', 'yt');
@@ -44,6 +50,7 @@ export default function AuthScreen() {
       });
 
       if (error) {
+        setAuthError(error.message || 'Failed to start Google sign in');
         Alert.alert('Google Sign-In Error', error.message);
         setLoading(false);
       } else if (data?.url) {
@@ -55,65 +62,91 @@ export default function AuthScreen() {
         }
       }
     } catch (err) {
-      Alert.alert('Sign-In Error', err.message || 'Failed to initiate Google sign in');
+      const msg = err.message || 'Failed to initiate Google sign in';
+      setAuthError(msg);
+      Alert.alert('Sign-In Error', msg);
       setLoading(false);
     }
   }
 
   async function handleAuthentication() {
     setPasswordError('');
+    setAuthError('');
+    setAuthSuccess('');
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setAuthError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setAuthError('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     
-    if (isSignUp) {
-      // Strong Password Validation
-      const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\\$%\\^&\\*])(?=.{8,})");
-      if (!strongRegex.test(password)) {
-        setPasswordError('Password must be at least 8 characters long, and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. !@#$%).');
-        setLoading(false);
-        return; // Stops here, password will not be sent to database
-      }
+    try {
+      if (isSignUp) {
+        // Strong Password Validation
+        const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\\$%\\^&\\*])(?=.{8,})");
+        if (!strongRegex.test(password)) {
+          setPasswordError('Password must be at least 8 characters long, and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. !@#$%).');
+          return;
+        }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: {
-            dob: dob,
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: password,
+          options: {
+            data: {
+              dob: dob,
+            }
+          }
+        });
+
+        if (error) {
+          const isExisting = error.message.toLowerCase().includes('already registered') || 
+                             error.message.toLowerCase().includes('already exists');
+          const msg = isExisting 
+            ? 'This email is already registered. Please sign in instead.' 
+            : error.message;
+          setAuthError(msg);
+          Alert.alert('Sign Up Error', msg);
+        } else if (data?.user?.identities && data.user.identities.length === 0) {
+          const msg = 'This email is already registered. Please sign in instead.';
+          setAuthError(msg);
+          Alert.alert('Sign Up Error', msg);
+        } else {
+          if (data?.session) {
+            router.replace('/dashboard');
+          } else {
+            setAuthSuccess('Account created! Please check your email to verify, or sign in.');
+            Alert.alert('Success', 'Account created! Please check your email to verify your account.');
+            setPassword('');
+            setIsSignUp(false);
           }
         }
-      });
-
-      if (error) {
-        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
-          Alert.alert('Sign Up Error', 'This email is linked to an existing account.');
-        } else {
-          Alert.alert('Sign Up Error', error.message);
-        }
-      } else if (data?.user?.identities && data.user.identities.length === 0) {
-        // Supabase returns an empty identities array for existing users when email confirmations are enabled
-        Alert.alert('Sign Up Error', 'This email is linked to an existing account.');
       } else {
-        if (data?.session) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+
+        if (error) {
+          setAuthError(error.message || 'Invalid email or password.');
+          Alert.alert('Sign In Error', error.message);
+        } else if (data?.session) {
           router.replace('/dashboard');
-        } else {
-          Alert.alert('Success', 'Account created! Please check your email to verify your account.');
-          setPassword('');
-          setIsSignUp(false);
         }
       }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-
-      if (error) {
-        Alert.alert('Sign In Error', error.message);
-      } else if (data?.session) {
-        router.replace('/dashboard');
-      }
+    } catch (err) {
+      const msg = err.message || 'A network error occurred. Please check your connection and try again.';
+      setAuthError(msg);
+      Alert.alert('Connection Error', msg);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -150,6 +183,19 @@ export default function AuthScreen() {
           {isSignUp ? 'Join StreamSync and sync your platforms.' : 'Sign in to your creator hub.'}
         </Animated.Text>
 
+        {/* Alerts */}
+        {authError ? (
+          <Animated.View entering={FadeInUp} style={styles.authAlertError}>
+            <Text style={styles.authAlertText}>{authError}</Text>
+          </Animated.View>
+        ) : null}
+
+        {authSuccess ? (
+          <Animated.View entering={FadeInUp} style={styles.authAlertSuccess}>
+            <Text style={styles.authAlertSuccessText}>{authSuccess}</Text>
+          </Animated.View>
+        ) : null}
+
         {/* Continue with Google */}
         <TouchableOpacity 
           style={styles.googleButton} 
@@ -177,8 +223,12 @@ export default function AuthScreen() {
             placeholder="you@example.com" 
             placeholderTextColor="#5a6270"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (authError) setAuthError('');
+            }}
             autoCapitalize="none"
+            keyboardType="email-address"
           />
         </View>
 
@@ -193,6 +243,7 @@ export default function AuthScreen() {
             onChangeText={(text) => {
               setPassword(text);
               if (passwordError) setPasswordError('');
+              if (authError) setAuthError('');
             }}
           />
           {passwordError ? (
@@ -209,17 +260,16 @@ export default function AuthScreen() {
               <input 
                 type="date"
                 style={{
-                  backgroundColor: '#0c0e12',
+                  backgroundColor: '#f8f8f8',
                   padding: '16px 18px',
                   borderRadius: 8,
                   fontSize: 14,
-                  color: '#e8eaed',
-                  border: '1px solid #1e2228',
+                  color: '#000',
+                  border: '1px solid #eee',
                   outline: 'none',
                   fontFamily: 'inherit',
                   width: '100%',
                   boxSizing: 'border-box',
-                  colorScheme: 'dark',
                 }}
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
@@ -310,7 +360,39 @@ const styles = StyleSheet.create({
     textAlign: 'center', letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 32,
+    fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 24,
+  },
+  authAlertError: {
+    backgroundColor: '#fff0f3',
+    borderWidth: 1,
+    borderColor: '#ffd0d7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  authAlertText: {
+    color: '#d90429',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  authAlertSuccess: {
+    backgroundColor: '#eefbf4',
+    borderWidth: 1,
+    borderColor: '#bbf2d3',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  authAlertSuccessText: {
+    color: '#15803d',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 18,
