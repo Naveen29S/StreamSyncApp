@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions, Image, Linking } from 'react-native';
 import { Link } from 'expo-router';
 import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
 
@@ -144,6 +144,48 @@ export default function App() {
             />
             <Text style={styles.footerBrandName}>StreamSync</Text>
           </View>
+
+          <View style={styles.footerLinks}>
+            <TouchableOpacity
+              accessibilityRole="link"
+              href="/privacy.html"
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.location.href = '/privacy.html';
+                } else {
+                  Linking.openURL('https://stream-sync-app.vercel.app/privacy.html');
+                }
+              }}
+              style={styles.footerLinkBtn}
+            >
+              <Text style={styles.footerLinkText}>Privacy Policy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="link"
+              href="/terms.html"
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.location.href = '/terms.html';
+                } else {
+                  Linking.openURL('https://stream-sync-app.vercel.app/terms.html');
+                }
+              }}
+              style={styles.footerLinkBtn}
+            >
+              <Text style={styles.footerLinkText}>Terms of Service</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="link"
+              href="mailto:naveensujith31@gmail.com"
+              onPress={() => Linking.openURL('mailto:naveensujith31@gmail.com')}
+              style={styles.footerLinkBtn}
+            >
+              <Text style={styles.footerLinkText}>Contact Support</Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.footerText}>© 2026 StreamSync. All rights reserved.</Text>
         </View>
       </View>
@@ -285,14 +327,37 @@ const styles = StyleSheet.create({
 
   // ─── Footer ───
   footer: {
-    paddingVertical: 60, paddingHorizontal: 32,
+    paddingVertical: 48, paddingHorizontal: 32,
     backgroundColor: '#9d50ff', // Match the vibrant gradient footer color from screenshot
     borderTopLeftRadius: 40, borderTopRightRadius: 40,
   },
   footerInner: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: width > 768 ? 'row' : 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+    maxWidth: 1100,
+    width: '100%',
+    alignSelf: 'center',
   },
   footerBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   footerBrandName: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  footerText: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  footerLinkBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  footerLinkText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  footerText: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
 });
