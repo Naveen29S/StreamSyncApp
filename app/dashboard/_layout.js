@@ -40,6 +40,9 @@ export default function DashboardLayout() {
       if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
         keyPlatforms.push('yt');
       }
+      if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
+        keyPlatforms.push('twitch');
+      }
 
       const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
 
@@ -203,6 +206,7 @@ export default function DashboardLayout() {
             <Text style={styles.sidebarSectionLabel}>PLATFORMS</Text>
             {[
               { id: 'yt', name: 'YouTube', color: '#FF0000' },
+              { id: 'twitch', name: 'Twitch', color: '#9146FF' },
               { id: 'ig', name: 'Instagram', color: '#E1306C' },
               { id: 'x', name: 'X', color: '#000000' },
               { id: 'fb', name: 'Facebook', color: '#1877F2' },

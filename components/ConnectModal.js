@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, disconnectPlatform } from '../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, connectTwitchViaApiKey, disconnectPlatform } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PLATFORMS = {
   YouTube:    { id: 'yt', color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
+  Twitch:     { id: 'twitch', color: '#9146FF', bg: 'rgba(145,70,255,0.08)', logo: 'https://img.icons8.com/color/512/twitch--v1.png' },
   Instagram:  { id: 'ig', color: '#E1306C', bg: 'rgba(225,48,108,0.08)', logo: 'https://img.icons8.com/fluent/512/instagram-new.png' },
   'X (Twitter)': { id: 'x', color: '#000000', bg: 'rgba(0,0,0,0.04)',      logo: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png' },
   Facebook:   { id: 'fb', color: '#1877F2', bg: 'rgba(24,119,242,0.08)', logo: 'https://img.icons8.com/color/512/facebook-new.png' },
@@ -25,6 +26,14 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [ytLoading, setYtLoading] = useState(false);
   const [ytModalError, setYtModalError] = useState('');
   const [ytModalSuccess, setYtModalSuccess] = useState('');
+
+  // Twitch modal states
+  const [twitchUsername, setTwitchUsername] = useState('shroud');
+  const [twitchClientId, setTwitchClientId] = useState('');
+  const [twitchClientSecret, setTwitchClientSecret] = useState('');
+  const [twitchLoading, setTwitchLoading] = useState(false);
+  const [twitchModalError, setTwitchModalError] = useState('');
+  const [twitchModalSuccess, setTwitchModalSuccess] = useState('');
 
   // General action states
   const [actionLoading, setActionLoading] = useState(false);
@@ -50,6 +59,9 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     const keyPlatforms = [];
     if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
       keyPlatforms.push('yt');
+    }
+    if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
+      keyPlatforms.push('twitch');
     }
 
     const { data: anRows } = await supabase
@@ -158,17 +170,81 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
+  async function handleTwitchConnect(customId, customSecret, customUser) {
+    const idToUse = (customId !== undefined ? customId : twitchClientId).trim();
+    const secToUse = (customSecret !== undefined ? customSecret : twitchClientSecret).trim();
+    const userToUse = (customUser !== undefined ? customUser : twitchUsername).trim();
+
+    if (!userToUse) {
+      setTwitchModalError('Please enter a Twitch username/channel handle.');
+      return;
+    }
+    if (!idToUse || !secToUse) {
+      setTwitchModalError('Please enter Twitch Client ID & Secret (or click Quick Demo below).');
+      return;
+    }
+
+    setTwitchLoading(true);
+    setTwitchModalError('');
+    setTwitchModalSuccess('');
+
+    try {
+      const channelData = await connectTwitchViaApiKey(idToUse, secToUse, userToUse);
+      setTwitchModalSuccess(`Successfully connected to: ${channelData.channel.title}!`);
+      await loadData();
+      if (onSuccess) await onSuccess();
+      setTimeout(() => {
+        setTwitchModalSuccess('');
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setTwitchModalError(err.message || 'Failed to connect Twitch channel.');
+    } finally {
+      setTwitchLoading(false);
+    }
+  }
+
+  async function handleQuickDemoTwitchConnect() {
+    setTwitchClientId('DEMO');
+    setTwitchClientSecret('DEMO');
+    setTwitchUsername('shroud');
+    await handleTwitchConnect('DEMO', 'DEMO', 'shroud');
+  }
+
+  async function handleSyncTwitchNow() {
+    setTwitchLoading(true);
+    setTwitchModalError('');
+    try {
+      await syncPlatformData(['twitch']);
+      await loadData();
+      if (onSuccess) await onSuccess();
+      setTwitchModalSuccess('Twitch stream data refreshed successfully!');
+      setTimeout(() => setTwitchModalSuccess(''), 2000);
+    } catch (e) {
+      setTwitchModalError(e.message || 'Sync failed');
+    } finally {
+      setTwitchLoading(false);
+    }
+  }
+
   async function handleDisconnect(platformKey) {
     setActionLoading(true);
     setYtLoading(true);
+    setTwitchLoading(true);
     setModalError('');
     setYtModalError('');
+    setTwitchModalError('');
     try {
       // Optimistically clear local state immediately
       setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, platformKey)));
       if (platformKey === 'yt') {
         setYtApiKey('');
         setYtChannelId('');
+      }
+      if (platformKey === 'twitch') {
+        setTwitchUsername('');
+        setTwitchClientId('');
+        setTwitchClientSecret('');
       }
 
       await disconnectPlatform(platformKey);
@@ -473,6 +549,129 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                 </View>
               )}
             </View>
+          ) : selectedPlatform === 'Twitch' ? (
+            /* Twitch Platform View */
+            (() => {
+              const isTwitchConn = connectedPlatforms.some(p => isPlatformMatch(p, 'twitch'));
+              return (
+                <View style={styles.tabBody}>
+                  {isTwitchConn && (
+                    <View style={styles.alreadyConnectedBox}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#9146FF' }} />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#9146FF' }}>Twitch Connected & Synced</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                        {apiKeys.twitch_channel_title || apiKeys.twitch_username ? `Channel: ${apiKeys.twitch_channel_title || apiKeys.twitch_username}` : 'Your Twitch channel is actively connected.'}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                        <TouchableOpacity 
+                          style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                          onPress={handleSyncTwitchNow}
+                          disabled={twitchLoading}
+                        >
+                          <Text style={styles.modalSecondaryBtnText}>
+                            {twitchLoading ? 'Syncing...' : '↻ Sync Now'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.modalDangerBtn, { flex: 1 }]} 
+                          onPress={() => handleDisconnect('twitch')}
+                          disabled={twitchLoading}
+                        >
+                          <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  <Text style={styles.modalDesc}>
+                    Connect your Twitch channel to sync live stream viewers, total followers, game categories, and top broadcast clips in real time.
+                  </Text>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>TWITCH CHANNEL USERNAME *</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. shroud, ninja, or your channel"
+                      placeholderTextColor="#999"
+                      value={twitchUsername}
+                      onChangeText={setTwitchUsername}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>TWITCH CLIENT ID</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. gp762nuuoqcoxypju8c569th9wz7q5"
+                      placeholderTextColor="#999"
+                      value={twitchClientId}
+                      onChangeText={setTwitchClientId}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>TWITCH CLIENT SECRET</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. ••••••••••••••••••••••••••••••••"
+                      placeholderTextColor="#999"
+                      value={twitchClientSecret}
+                      onChangeText={setTwitchClientSecret}
+                      secureTextEntry={true}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={() => Linking.openURL('https://dev.twitch.tv/console/apps')}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#9146FF', fontWeight: '600' }}>
+                      Need free Twitch API keys? Create a free app at dev.twitch.tv/console ↗
+                    </Text>
+                  </TouchableOpacity>
+
+                  {twitchModalError ? (
+                    <View style={styles.errorBanner}>
+                      <Text style={styles.errorBannerText}>{twitchModalError}</Text>
+                    </View>
+                  ) : null}
+
+                  {twitchModalSuccess ? (
+                    <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                      <Text style={[styles.errorBannerText, { color: '#166534' }]}>{twitchModalSuccess}</Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity 
+                    style={[styles.modalPrimaryBtn, { backgroundColor: '#9146FF' }]} 
+                    onPress={() => handleTwitchConnect()}
+                    disabled={twitchLoading}
+                  >
+                    {twitchLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.modalPrimaryBtnText}>Connect Twitch Channel</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#9146FF' }]} 
+                    onPress={handleQuickDemoTwitchConnect}
+                    disabled={twitchLoading}
+                  >
+                    <Text style={[styles.modalSecondaryBtnText, { color: '#9146FF' }]}>⚡ Quick Demo: Test with Shroud Channel</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()
           ) : (
             /* Non-YouTube Platforms */
             (() => {

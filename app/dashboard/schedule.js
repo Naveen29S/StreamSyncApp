@@ -32,6 +32,7 @@ export default function ScheduleScreen() {
     if (!newPostTitle) return;
     const colorMap = {
       'YouTube': '#FF0000',
+      'Twitch': '#9146FF',
       'Instagram': '#E1306C',
       'X (Twitter)': '#000000',
       'Facebook': '#1877F2',
@@ -129,7 +130,7 @@ export default function ScheduleScreen() {
             <View style={styles.modalBody}>
               <Text style={styles.label}>Select Platform</Text>
               <View style={styles.platformSelector}>
-                {['YouTube', 'Instagram', 'X (Twitter)', 'LinkedIn', 'Facebook'].map(p => (
+                {['YouTube', 'Twitch', 'Instagram', 'X (Twitter)', 'LinkedIn', 'Facebook'].map(p => (
                   <TouchableOpacity 
                     key={p} 
                     style={[styles.platformChip, newPostPlatform === p && styles.platformChipActive]}

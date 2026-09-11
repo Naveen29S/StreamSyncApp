@@ -158,6 +158,7 @@ export default function AnalyticsScreen() {
 
   const PLATFORM_COLORS = {
     'YouTube': '#FF0000',
+    'Twitch': '#9146FF',
     'Instagram': '#E1306C',
     'X (Twitter)': '#000000',
     'Facebook': '#1877F2',

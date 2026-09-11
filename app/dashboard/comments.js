@@ -7,6 +7,7 @@ import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
+  'Twitch': '#9146FF',
   'Instagram': '#E1306C',
   'X (Twitter)': '#000000',
   'Facebook': '#1877F2',
@@ -60,6 +61,9 @@ export default function CommentsScreen() {
       const keyPlatforms = [];
       if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
         keyPlatforms.push('yt');
+      }
+      if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
+        keyPlatforms.push('twitch');
       }
 
       const { data: anRows } = await supabase

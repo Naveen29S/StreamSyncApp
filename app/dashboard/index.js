@@ -7,6 +7,7 @@ import ConnectModal from '../../components/ConnectModal';
 
 const PLATFORMS = {
   YouTube:    { color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
+  Twitch:     { color: '#9146FF', bg: 'rgba(145,70,255,0.08)', logo: 'https://img.icons8.com/color/512/twitch--v1.png' },
   Instagram:  { color: '#E1306C', bg: 'rgba(225,48,108,0.08)', logo: 'https://img.icons8.com/fluent/512/instagram-new.png' },
   'X (Twitter)': { color: '#000000', bg: 'rgba(0,0,0,0.04)',      logo: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png' },
   Facebook:   { color: '#1877F2', bg: 'rgba(24,119,242,0.08)', logo: 'https://img.icons8.com/color/512/facebook-new.png' },
@@ -44,7 +45,7 @@ export default function DashboardIndex() {
 
   useEffect(() => {
     if (params?.connect) {
-      const pMap = { yt: 'YouTube', youtube: 'YouTube', ig: 'Instagram', instagram: 'Instagram', x: 'X (Twitter)', twitter: 'X (Twitter)', fb: 'Facebook', facebook: 'Facebook', in: 'LinkedIn', linkedin: 'LinkedIn' };
+      const pMap = { yt: 'YouTube', youtube: 'YouTube', twitch: 'Twitch', ig: 'Instagram', instagram: 'Instagram', x: 'X (Twitter)', twitter: 'X (Twitter)', fb: 'Facebook', facebook: 'Facebook', in: 'LinkedIn', linkedin: 'LinkedIn' };
       const plat = pMap[String(params.connect).toLowerCase()] || 'YouTube';
       openConnectModal(plat);
       if (Platform.OS === 'web') {
@@ -270,7 +271,7 @@ export default function DashboardIndex() {
 
       <View style={styles.platformGrid}>
         {Object.entries(PLATFORMS).map(([name, config]) => {
-          const dbKeyMap = { 'YouTube': 'yt', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
+          const dbKeyMap = { 'YouTube': 'yt', 'Twitch': 'twitch', 'Instagram': 'ig', 'X (Twitter)': 'x', 'Facebook': 'fb', 'LinkedIn': 'in' };
           const pKey = dbKeyMap[name] || normalizePlatformKey(name);
           const stats = data?.platformStats?.[name] || data?.platformStats?.[pKey];
           const hasApiData = Boolean(stats && (stats.rawFollowers !== undefined || stats.rawViews !== undefined));
@@ -356,7 +357,7 @@ export default function DashboardIndex() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Cross-Platform Content</Text>
         <View style={styles.tabRow}>
-          {['all', 'YouTube', 'Instagram', 'X'].map((tab) => (
+          {['all', 'YouTube', 'Twitch', 'Instagram', 'X'].map((tab) => (
             <TouchableOpacity 
               key={tab} 
               style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
