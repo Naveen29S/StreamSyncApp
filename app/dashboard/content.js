@@ -34,7 +34,7 @@ export default function ContentScreen() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
-  const filters = ['All', 'YouTube', 'Twitch', 'Video', 'Image', 'Text'];
+  const filters = ['All', 'YouTube', 'Twitch', 'X (Twitter)', 'Video', 'Image', 'Text'];
 
   const loadContent = async () => {
     try {
@@ -58,6 +58,9 @@ export default function ContentScreen() {
       }
       if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
         keyPlatforms.push('twitch');
+      }
+      if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
+        keyPlatforms.push('x');
       }
 
       const { data: anRows } = await supabase
@@ -169,6 +172,8 @@ export default function ContentScreen() {
   const filteredPosts = posts.filter(p => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'YouTube') return p.platformKey === 'yt' || p.platform === 'YouTube';
+    if (activeFilter === 'Twitch') return p.platformKey === 'twitch' || p.platform === 'Twitch';
+    if (activeFilter === 'X (Twitter)' || activeFilter === 'X') return p.platformKey === 'x' || p.platform.includes('X') || p.platform.includes('Twitter');
     if (activeFilter === 'Video') return p.type === 'Video';
     if (activeFilter === 'Image') return p.type === 'Image';
     if (activeFilter === 'Text') return p.type === 'Text';

@@ -65,6 +65,9 @@ export default function CommentsScreen() {
       if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
         keyPlatforms.push('twitch');
       }
+      if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
+        keyPlatforms.push('x');
+      }
 
       const { data: anRows } = await supabase
         .from('analytics')
@@ -194,6 +197,8 @@ export default function CommentsScreen() {
   const filteredComments = comments.filter(c => {
     if (activeFilter === 'Unread') return c.unread && !resolvedMap[c.id];
     if (activeFilter === 'YouTube') return c.platform === 'YouTube';
+    if (activeFilter === 'Twitch') return c.platform === 'Twitch';
+    if (activeFilter === 'X (Twitter)' || activeFilter === 'X') return c.platform.includes('X') || c.platform.includes('Twitter');
     return true;
   });
 
@@ -218,7 +223,7 @@ export default function CommentsScreen() {
             <Text style={styles.refreshBtnText}>{syncing ? 'Syncing...' : '↻ Refresh'}</Text>
           </TouchableOpacity>
           <View style={styles.headerFilters}>
-            {['All', 'Unread', 'YouTube'].map(f => (
+            {['All', 'Unread', 'YouTube', 'Twitch', 'X (Twitter)'].map(f => (
               <TouchableOpacity 
                 key={f}
                 style={[styles.filterBtn, activeFilter === f && styles.filterBtnActive]}

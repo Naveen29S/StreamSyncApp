@@ -68,13 +68,33 @@ export default function DashboardIndex() {
       await processSessionOAuthTokens(session);
     }
     
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('connected_platforms, api_keys')
-      .eq('id', session.user.id)
-      .maybeSingle();
+    const [profileRes, anRes] = await Promise.all([
+      supabase.from('profiles').select('connected_platforms, api_keys').eq('id', session.user.id).maybeSingle(),
+      supabase.from('analytics').select('platform').eq('user_id', session.user.id)
+    ]);
+    const profile = profileRes.data;
+    const anRows = anRes.data || [];
 
-    const platforms = (profile?.connected_platforms || []).map(p => normalizePlatformKey(p)).filter(Boolean);
+    const apiKeys = profile?.api_keys || {};
+    const keyPlatforms = [];
+    if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
+      keyPlatforms.push('yt');
+    }
+    if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
+      keyPlatforms.push('twitch');
+    }
+    if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
+      keyPlatforms.push('x');
+    }
+
+    const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
+
+    const rawList = [
+      ...(profile?.connected_platforms || []),
+      ...keyPlatforms,
+      ...anPlatforms
+    ];
+    const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     
     setConnectedPlatforms(platforms);
     

@@ -337,13 +337,21 @@ serve(async (req) => {
     // ==========================================
     // X (TWITTER) INTEGRATION
     // ==========================================
-    if ((platformsToUpdate.includes('x') || platformsToUpdate.includes('x (twitter)')) && apiKeys['x']) {
+    if ((platformsToUpdate.includes('x') || platformsToUpdate.includes('x (twitter)')) && (apiKeys['x'] || apiKeys['x_bearer_token'])) {
       try {
-        const token = apiKeys['x'];
-        const res = await fetch(`https://api.twitter.com/2/users/me?user.fields=public_metrics`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const xData = await res.json();
+        const token = apiKeys['x'] || apiKeys['x_bearer_token'];
+        if (token === 'DEMO') {
+          console.log("X in DEMO mode - client synced.");
+        } else {
+          const xUser = apiKeys['x_username'] || apiKeys['twitter_username'];
+          const userUrl = xUser
+            ? `https://api.twitter.com/2/users/by/username/${encodeURIComponent(xUser.replace(/^@/, ''))}?user.fields=public_metrics`
+            : `https://api.twitter.com/2/users/me?user.fields=public_metrics`;
+
+          const res = await fetch(userUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const xData = await res.json();
         
         let userIdStr = '';
         if (xData.data) {
@@ -381,6 +389,7 @@ serve(async (req) => {
              }
           }
         }
+      }
       } catch (e) {
         console.error("X Error:", e);
       }

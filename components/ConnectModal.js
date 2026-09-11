@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, connectTwitchViaApiKey, disconnectPlatform } from '../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, connectTwitchViaApiKey, connectXViaApiKey, disconnectPlatform } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PLATFORMS = {
   YouTube:    { id: 'yt', color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
   Twitch:     { id: 'twitch', color: '#9146FF', bg: 'rgba(145,70,255,0.08)', logo: 'https://img.icons8.com/color/512/twitch--v1.png' },
-  Instagram:  { id: 'ig', color: '#E1306C', bg: 'rgba(225,48,108,0.08)', logo: 'https://img.icons8.com/fluent/512/instagram-new.png' },
   'X (Twitter)': { id: 'x', color: '#000000', bg: 'rgba(0,0,0,0.04)',      logo: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png' },
+  Instagram:  { id: 'ig', color: '#E1306C', bg: 'rgba(225,48,108,0.08)', logo: 'https://img.icons8.com/fluent/512/instagram-new.png' },
   Facebook:   { id: 'fb', color: '#1877F2', bg: 'rgba(24,119,242,0.08)', logo: 'https://img.icons8.com/color/512/facebook-new.png' },
   LinkedIn:   { id: 'in', color: '#0A66C2', bg: 'rgba(10,102,194,0.08)', logo: 'https://img.icons8.com/color/512/linkedin.png' },
 };
@@ -34,6 +34,13 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [twitchLoading, setTwitchLoading] = useState(false);
   const [twitchModalError, setTwitchModalError] = useState('');
   const [twitchModalSuccess, setTwitchModalSuccess] = useState('');
+
+  // X (Twitter) modal states
+  const [xUsername, setXUsername] = useState('TwitterDev');
+  const [xBearerToken, setXBearerToken] = useState('');
+  const [xLoading, setXLoading] = useState(false);
+  const [xModalError, setXModalError] = useState('');
+  const [xModalSuccess, setXModalSuccess] = useState('');
 
   // General action states
   const [actionLoading, setActionLoading] = useState(false);
@@ -62,6 +69,9 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
     if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
       keyPlatforms.push('twitch');
+    }
+    if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
+      keyPlatforms.push('x');
     }
 
     const { data: anRows } = await supabase
@@ -93,9 +103,20 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         setYtApiKey('');
         setYtChannelId('');
       }
+
+      const isXConnected = platforms.includes('x');
+      if (isXConnected) {
+        setXUsername(profile.api_keys.x_username || profile.api_keys.twitter_username || 'TwitterDev');
+        setXBearerToken(profile.api_keys.x_bearer_token || profile.api_keys.x || '');
+      } else {
+        setXUsername('TwitterDev');
+        setXBearerToken('');
+      }
     } else {
       setYtApiKey('');
       setYtChannelId('');
+      setXUsername('TwitterDev');
+      setXBearerToken('');
     }
   };
 
@@ -107,6 +128,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       setModalSuccess('');
       setYtModalError('');
       setYtModalSuccess('');
+      setTwitchModalError('');
+      setTwitchModalSuccess('');
+      setXModalError('');
+      setXModalSuccess('');
       loadData();
     }
   }, [visible, initialPlatform]);
@@ -227,13 +252,60 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
+  async function handleXConnect(customToken, customUser) {
+    const tokenToUse = customToken !== undefined ? customToken : xBearerToken;
+    const userToUse = customUser !== undefined ? customUser : xUsername;
+
+    setXLoading(true);
+    setXModalError('');
+    setXModalSuccess('');
+    try {
+      await connectXViaApiKey(tokenToUse, userToUse);
+      setXModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
+      await loadData();
+      if (onSuccess) await onSuccess();
+      setTimeout(() => {
+        setXModalSuccess('');
+        onClose();
+      }, 1200);
+    } catch (err) {
+      setXModalError(err.message || 'Failed to connect X account.');
+    } finally {
+      setXLoading(false);
+    }
+  }
+
+  async function handleQuickDemoXConnect() {
+    setXBearerToken('DEMO');
+    setXUsername('TwitterDev');
+    await handleXConnect('DEMO', 'TwitterDev');
+  }
+
+  async function handleSyncXNow() {
+    setXLoading(true);
+    setXModalError('');
+    try {
+      await syncPlatformData(['x']);
+      await loadData();
+      if (onSuccess) await onSuccess();
+      setXModalSuccess('X account data refreshed successfully!');
+      setTimeout(() => setXModalSuccess(''), 2000);
+    } catch (e) {
+      setXModalError(e.message || 'Sync failed');
+    } finally {
+      setXLoading(false);
+    }
+  }
+
   async function handleDisconnect(platformKey) {
     setActionLoading(true);
     setYtLoading(true);
     setTwitchLoading(true);
+    setXLoading(true);
     setModalError('');
     setYtModalError('');
     setTwitchModalError('');
+    setXModalError('');
     try {
       // Optimistically clear local state immediately
       setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, platformKey)));
@@ -246,6 +318,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         setTwitchClientId('');
         setTwitchClientSecret('');
       }
+      if (platformKey === 'x') {
+        setXUsername('');
+        setXBearerToken('');
+      }
 
       await disconnectPlatform(platformKey);
       await loadData();
@@ -254,9 +330,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       }
       setModalSuccess('Platform disconnected.');
       setYtModalSuccess('Platform disconnected.');
+      setXModalSuccess('Platform disconnected.');
       setTimeout(() => {
         setModalSuccess('');
         setYtModalSuccess('');
+        setXModalSuccess('');
       }, 1000);
     } catch (e) {
       const msg = e.message || 'Failed to disconnect';
@@ -668,6 +746,117 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     disabled={twitchLoading}
                   >
                     <Text style={[styles.modalSecondaryBtnText, { color: '#9146FF' }]}>⚡ Quick Demo: Test with Shroud Channel</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()
+          ) : selectedPlatform === 'X (Twitter)' ? (
+            /* X (Twitter) Dedicated Connect View */
+            (() => {
+              const isConn = connectedPlatforms.some(p => isPlatformMatch(p, 'x'));
+
+              return (
+                <View style={styles.tabBody}>
+                  {isConn && (
+                    <View style={[styles.alreadyConnectedBox, { marginBottom: 16 }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>X Account Connected & Synced</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                        Connected as @{xUsername || 'user'}. Analytics, impressions, and tweets are actively synced with your dashboard.
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                        <TouchableOpacity 
+                          style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                          onPress={handleSyncXNow}
+                          disabled={xLoading}
+                        >
+                          <Text style={styles.modalSecondaryBtnText}>
+                            {xLoading ? 'Syncing...' : '↻ Sync Now'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.modalDangerBtn, { flex: 1 }]} 
+                          onPress={() => handleDisconnect('x')}
+                          disabled={xLoading}
+                        >
+                          <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  <Text style={styles.modalDesc}>
+                    Connect your X (Twitter) account to sync tweet impressions, followers count, engagement rate, and recent posts directly into your StreamSync dashboard.
+                  </Text>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>X (TWITTER) USERNAME / HANDLE *</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. TwitterDev, elonmusk, or your handle"
+                      placeholderTextColor="#999"
+                      value={xUsername}
+                      onChangeText={setXUsername}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>X API BEARER TOKEN (OPTIONAL FOR QUICK DEMO)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="e.g. AAAAAAAAAAAAAAAAAAAAA... (or DEMO)"
+                      placeholderTextColor="#999"
+                      value={xBearerToken}
+                      onChangeText={setXBearerToken}
+                      secureTextEntry={true}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={() => Linking.openURL('https://developer.x.com/en/portal/dashboard')}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#000000', fontWeight: '600' }}>
+                      Get your Bearer Token at developer.x.com ↗ (or click Quick Demo below)
+                    </Text>
+                  </TouchableOpacity>
+
+                  {xModalError ? (
+                    <View style={styles.errorBanner}>
+                      <Text style={styles.errorBannerText}>{xModalError}</Text>
+                    </View>
+                  ) : null}
+
+                  {xModalSuccess ? (
+                    <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                      <Text style={[styles.errorBannerText, { color: '#166534' }]}>{xModalSuccess}</Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity 
+                    style={[styles.modalPrimaryBtn, { backgroundColor: '#000000' }]} 
+                    onPress={() => handleXConnect()}
+                    disabled={xLoading}
+                  >
+                    {xLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.modalPrimaryBtnText}>Connect X Account</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#000000' }]} 
+                    onPress={handleQuickDemoXConnect}
+                    disabled={xLoading}
+                  >
+                    <Text style={[styles.modalSecondaryBtnText, { color: '#000000' }]}>⚡ Quick Demo: Test with @TwitterDev</Text>
                   </TouchableOpacity>
                 </View>
               );

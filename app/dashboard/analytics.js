@@ -48,6 +48,12 @@ export default function AnalyticsScreen() {
     if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
       keyPlatforms.push('yt');
     }
+    if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
+      keyPlatforms.push('twitch');
+    }
+    if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
+      keyPlatforms.push('x');
+    }
 
     const { data: anRows } = await supabase
       .from('analytics')

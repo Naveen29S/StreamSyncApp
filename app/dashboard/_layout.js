@@ -43,6 +43,9 @@ export default function DashboardLayout() {
       if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
         keyPlatforms.push('twitch');
       }
+      if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
+        keyPlatforms.push('x');
+      }
 
       const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
 
