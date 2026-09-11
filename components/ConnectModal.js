@@ -383,6 +383,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         break;
       case 'x':
         provider = 'twitter';
+        scopes = 'tweet.read users.read offline.access';
         break;
       case 'in':
         provider = 'linkedin_oidc';
@@ -790,6 +791,29 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   <Text style={styles.modalDesc}>
                     Connect your X (Twitter) account to sync tweet impressions, followers count, engagement rate, and recent posts directly into your StreamSync dashboard.
                   </Text>
+
+                  {/* 1-Click OAuth 2.0 (No API key needed) */}
+                  <TouchableOpacity 
+                    style={[styles.googleOAuthBtn, { backgroundColor: '#000000', borderColor: '#000000', marginTop: 4, marginBottom: 12 }]} 
+                    onPress={() => handleOAuthConnect('x')}
+                    disabled={actionLoading}
+                  >
+                    <Image 
+                      source={{ uri: PLATFORMS['X (Twitter)'].logo }} 
+                      style={{ width: 18, height: 18, marginRight: 10, tintColor: '#ffffff' }} 
+                    />
+                    <Text style={[styles.googleOAuthBtnText, { color: '#ffffff' }]}>
+                      {actionLoading ? "Connecting with X..." : "Continue with X (1-Click OAuth 2.0)"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: '#e5e5e5' }} />
+                    <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.5 }}>
+                      OR QUICK DEMO / MANUAL API KEY
+                    </Text>
+                    <View style={{ flex: 1, height: 1, backgroundColor: '#e5e5e5' }} />
+                  </View>
 
                   <View style={styles.formGroup}>
                     <Text style={styles.inputLabel}>X (TWITTER) USERNAME / HANDLE *</Text>
