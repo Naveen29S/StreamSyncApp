@@ -657,7 +657,7 @@ export default function ConnectsScreen() {
                 style={[
                   styles.card, 
                   { backgroundColor: colors.cardBg, borderColor: colors.border },
-                  isConnected && [styles.cardConnected, { borderColor: isDark ? colors.accent : '#000' }]
+                  isConnected && [styles.cardConnected, { borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : '#000' }]
                 ]}
               >
                 <View style={styles.cardLeft}>
@@ -1301,8 +1301,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 10,
   },
   cardConnected: {
-    borderColor: 'rgba(157, 80, 255, 0.3)',
-    backgroundColor: 'rgba(157, 80, 255, 0.02)',
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+    backgroundColor: 'transparent',
   },
   cardLeft: {
     flexDirection: 'row',

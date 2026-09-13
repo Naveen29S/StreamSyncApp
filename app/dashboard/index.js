@@ -622,8 +622,8 @@ const styles = StyleSheet.create({
     flex: 1, minWidth: 190, backgroundColor: '#fff',
     padding: 20, borderRadius: 20,
     borderWidth: 1, borderColor: '#f0f0f0',
-    ...(Platform.OS === 'web' ? { boxShadow: '0px 8px 20px rgba(157, 80, 255, 0.05)' } : {
-      shadowColor: '#9d50ff', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.08, shadowRadius: 30, elevation: 4
+    ...(Platform.OS === 'web' ? { boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.04)' } : {
+      shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 20, elevation: 3
     })
   },
   statHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },

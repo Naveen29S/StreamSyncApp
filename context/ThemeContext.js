@@ -155,11 +155,10 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
     html:not([data-theme="dark"]) [data-grid-box="true"]:hover,
     html:not([data-theme="dark"]) .streamsync-grid-box:hover {
       transform: translateY(-5px) !important;
-      border-color: rgba(157, 80, 255, 0.4) !important;
+      border-color: #ffffff !important;
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12),
                   0 0 26px rgba(255, 255, 255, 0.98),
-                  0 0 0 2px rgba(255, 255, 255, 1),
-                  0 0 16px rgba(157, 80, 255, 0.25) !important;
+                  0 0 0 2px rgba(255, 255, 255, 1) !important;
       cursor: pointer;
     }
 
