@@ -578,7 +578,7 @@ export default function ConnectsScreen() {
   async function handlePhylloConnect() {
     const clean = (igUsername || '').trim().replace(/^@/, '');
     if (!clean) {
-      setIgModalError('Please enter your Instagram username in the field below first.');
+      setIgModalError('Please enter your Instagram username in the box above to connect.');
       return;
     }
 
@@ -1575,72 +1575,133 @@ export default function ConnectsScreen() {
               </Text>
             </View>
 
-            <View style={styles.tabBody}>
-              <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
+            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.tabBody}>
+              <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 4 }]}>
                 Enter your Instagram username below to connect via Phyllo and synchronize your followers, reel views, reach insights, and engagement metrics.
               </Text>
 
-              {/* Primary Instagram Username Input Card */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
-                <TextInput
-                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. yourname, creators, or @yourname"
-                  placeholderTextColor={colors.textSecondary}
-                  value={igUsername}
-                  onChangeText={setIgUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+              {/* Primary Instagram Input & Phyllo Connect Card */}
+              <View style={{
+                backgroundColor: isDark ? 'rgba(108, 92, 231, 0.12)' : 'rgba(108, 92, 231, 0.05)',
+                borderRadius: 16,
+                padding: 16,
+                borderWidth: 1.5,
+                borderColor: '#6C5CE7',
+                gap: 12
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Feather name="at-sign" size={16} color="#6C5CE7" />
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDark ? '#c4b5fd' : '#4338ca', letterSpacing: 0.5 }}>
+                      ENTER INSTAGRAM USERNAME
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={() => setIgUsername('creators')}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: isDark ? '#a5b4fc' : '#4f46e5', fontWeight: '600' }}>
+                      Demo: @creators
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Explicit Text Box with @ Icon */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: igModalError && !igUsername.trim() ? '#ef4444' : (isDark ? '#64748b' : '#94a3b8'),
+                  overflow: 'hidden'
+                }}>
+                  <View style={{
+                    backgroundColor: '#6C5CE7',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 16 }}>@</Text>
+                  </View>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: isDark ? '#ffffff' : '#000000',
+                      backgroundColor: 'transparent',
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {})
+                    }}
+                    placeholder="your_handle (e.g. creators or yourname)"
+                    placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                    value={igUsername}
+                    onChangeText={(text) => {
+                      setIgUsername(text);
+                      if (igModalError) setIgModalError('');
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                {igModalError ? (
+                  <View style={styles.errorBanner}>
+                    <Text style={styles.errorBannerText}>{igModalError}</Text>
+                  </View>
+                ) : null}
+
+                {igModalSuccess ? (
+                  <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                    <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
+                  </View>
+                ) : null}
+
+                {/* Phyllo Connect 1-Click Hero Button */}
+                <TouchableOpacity 
+                  style={[
+                    styles.modalPrimaryBtn, 
+                    { 
+                      backgroundColor: '#6C5CE7', 
+                      paddingVertical: 14, 
+                      borderRadius: 10,
+                      shadowColor: '#6C5CE7',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.35,
+                      shadowRadius: 8,
+                      elevation: 4
+                    }
+                  ]} 
+                  onPress={handlePhylloConnect}
+                  disabled={igLoading}
+                >
+                  {igLoading ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <Image 
+                        source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
+                        style={{ width: 20, height: 20 }} 
+                      />
+                      <Text style={[styles.modalPrimaryBtnText, { fontSize: 15, fontWeight: '700' }]}>
+                        {igUsername.trim() ? `Connect @${igUsername.trim().replace(/^@/, '')} via Phyllo` : 'Connect via Phyllo'}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <Text style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', textAlign: 'center' }}>
                   Zero passwords, zero Meta App IDs, and zero bio codes required.
                 </Text>
               </View>
-
-              {igModalError ? (
-                <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerText}>{igModalError}</Text>
-                </View>
-              ) : null}
-
-              {igModalSuccess ? (
-                <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                  <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
-                </View>
-              ) : null}
-
-              {/* Phyllo Connect 1-Click Hero Button */}
-              <TouchableOpacity 
-                style={[
-                  styles.modalPrimaryBtn, 
-                  { 
-                    backgroundColor: '#6C5CE7', 
-                    paddingVertical: 14, 
-                    marginBottom: 10,
-                    shadowColor: '#6C5CE7',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }
-                ]} 
-                onPress={handlePhylloConnect}
-                disabled={igLoading}
-              >
-                {igLoading ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                    <Image 
-                      source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
-                      style={{ width: 20, height: 20 }} 
-                    />
-                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 15, fontWeight: '700' }]}>
-                      Connect via Phyllo
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
 
               {/* Quick Calibration Sync Button */}
               <TouchableOpacity 
@@ -1726,7 +1787,7 @@ export default function ConnectsScreen() {
                   </View>
                 </View>
               )}
-            </View>
+            </ScrollView>
 
           </View>
         </View>
