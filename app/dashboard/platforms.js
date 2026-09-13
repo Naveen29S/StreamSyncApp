@@ -491,7 +491,7 @@ export default function ConnectsScreen() {
     try {
       const clean = (igUsername || '').trim().replace(/^@/, '');
       if (!clean) {
-        setIgModalError('Please enter your Instagram handle.');
+        setIgModalError('Please enter your Instagram username.');
         return;
       }
       setIgModalError('');
@@ -517,7 +517,7 @@ export default function ConnectsScreen() {
   async function handleVerifyIgOwnership() {
     const clean = (igUsername || '').trim().replace(/^@/, '');
     if (!clean) {
-      setIgModalError('Please enter your Instagram handle.');
+      setIgModalError('Please enter your Instagram username.');
       return;
     }
 
@@ -1438,17 +1438,17 @@ export default function ConnectsScreen() {
             </View>
 
             {igStep === 'input' ? (
-              /* STEP 1: Enter your Instagram handle */
+              /* STEP 1: Enter your Instagram username */
               <View style={styles.tabBody}>
                 <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
                   Connect your personal or creator Instagram account to display your live followers, reel views, engagement rate, and audience analytics.
                 </Text>
 
                 <View style={styles.formGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM HANDLE / USERNAME *</Text>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
                   <TextInput
                     style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                    placeholder="e.g. yourhandle or @youraccount"
+                    placeholder="e.g. yourname or @yourname"
                     placeholderTextColor={colors.textSecondary}
                     value={igUsername}
                     onChangeText={setIgUsername}
@@ -1456,7 +1456,7 @@ export default function ConnectsScreen() {
                     autoCorrect={false}
                   />
                   <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                    Enter your own Instagram account handle without passwords.
+                    Enter your own Instagram username without passwords.
                   </Text>
                 </View>
 
@@ -1505,7 +1505,7 @@ export default function ConnectsScreen() {
                     onPress={() => { setIgStep('input'); setIgModalError(''); }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>Change handle</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>Change username</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1599,7 +1599,7 @@ export default function ConnectsScreen() {
                   disabled={igLoading}
                 >
                   <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
-                    ← Back to Handle Input
+                    ← Back to Username Input
                   </Text>
                 </TouchableOpacity>
               </View>
