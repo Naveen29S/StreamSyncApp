@@ -3,10 +3,11 @@ import { StyleSheet, TouchableOpacity, View, Text, Platform, Animated } from 're
 import { useTheme } from '../context/ThemeContext';
 
 export default function ThemeToggle({ style, showLabel = false, size = 'default' }) {
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme, currentSpeedConfig } = useTheme();
 
   const isSmall = size === 'small';
   const slotSize = isSmall ? 24 : 28;
+  const durationStr = currentSpeedConfig?.cssDuration || '0.85s';
 
   // Native animated fallback for iOS/Android
   const animValue = useRef(new Animated.Value(isDark ? 1 : 0)).current;
@@ -31,6 +32,9 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
         styles.container,
         isDark ? styles.containerDark : styles.containerLight,
         isSmall && styles.containerSmall,
+        Platform.OS === 'web' ? {
+          transition: `background-color ${durationStr} ease, border-color ${durationStr} ease`,
+        } : {},
         style
       ]}
       accessibilityRole="button"
@@ -46,7 +50,7 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
             isDark ? styles.pillDark : styles.pillLight,
             {
               transform: [{ translateX: isDark ? slotSize : 0 }],
-              transition: 'transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.38s ease, border-color 0.38s ease, box-shadow 0.38s ease',
+              transition: `transform ${durationStr} cubic-bezier(0.16, 1, 0.3, 1), background-color ${durationStr} ease, border-color ${durationStr} ease, box-shadow ${durationStr} ease`,
             }
           ]}
         />
@@ -78,7 +82,7 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
           Platform.OS === 'web' ? {
             opacity: isDark ? 0.35 : 1,
             transform: [{ scale: isDark ? 0.86 : 1.06 }, { rotate: isDark ? '-24deg' : '0deg' }],
-            transition: 'opacity 0.35s ease, transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: `opacity 0.35s ease, transform ${durationStr} cubic-bezier(0.16, 1, 0.3, 1)`,
           } : {
             opacity: !isDark ? 1 : 0.4,
           }
@@ -97,7 +101,7 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
           Platform.OS === 'web' ? {
             opacity: isDark ? 1 : 0.35,
             transform: [{ scale: isDark ? 1.06 : 0.86 }, { rotate: isDark ? '0deg' : '24deg' }],
-            transition: 'opacity 0.35s ease, transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: `opacity 0.35s ease, transform ${durationStr} cubic-bezier(0.16, 1, 0.3, 1)`,
           } : {
             opacity: isDark ? 1 : 0.4,
           }

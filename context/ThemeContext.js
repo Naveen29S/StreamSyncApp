@@ -11,9 +11,55 @@ if (Platform.OS === 'web') {
 }
 
 const THEME_STORAGE_KEY = 'streamsync_theme_preference';
+const THEME_SPEED_STORAGE_KEY = 'streamsync_transition_speed_preference';
+
+export const TRANSITION_SPEED_OPTIONS = {
+  gentle: {
+    id: 'gentle',
+    label: 'Gentle (0.65s)',
+    shortLabel: 'Gentle',
+    durationText: '0.65s',
+    durationMs: 650,
+    cssDuration: '0.65s',
+    desc: 'Soft & comfortable pace — gentle on the eyes',
+    badge: 'Soft',
+  },
+  cinematic: {
+    id: 'cinematic',
+    label: 'Cinematic (0.85s)',
+    shortLabel: 'Cinematic',
+    durationText: '0.85s',
+    durationMs: 850,
+    cssDuration: '0.85s',
+    desc: 'Golden-ratio slow dissolve — luxurious twilight melt',
+    badge: 'Best Slow (Recommended)',
+    isRecommended: true,
+  },
+  twilight: {
+    id: 'twilight',
+    label: 'Twilight (1.2s)',
+    shortLabel: 'Twilight',
+    durationText: '1.2s',
+    durationMs: 1200,
+    cssDuration: '1.2s',
+    desc: 'Theatrical slow pace — watch day softly dissolve into night',
+    badge: 'Dramatic',
+  },
+  dream: {
+    id: 'dream',
+    label: 'Dream (1.6s)',
+    shortLabel: 'Dream',
+    durationText: '1.6s',
+    durationMs: 1600,
+    cssDuration: '1.6s',
+    desc: 'Ultra-slow ambient dissolve for maximum visual calm and immersion',
+    badge: 'Deep Ambient',
+  },
+};
 
 // Web CSS injection for silky-smooth, cinema-grade theme transition
-if (Platform.OS === 'web' && typeof document !== 'undefined') {
+function injectThemeTransitionStyles(cssDuration = '0.85s') {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   const STYLE_ID = 'streamsync-theme-transition-styles';
   let styleEl = document.getElementById(STYLE_ID);
   if (!styleEl) {
@@ -34,13 +80,13 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       mix-blend-mode: normal;
     }
 
-    /* Native GPU-accelerated View Transition fade */
+    /* Native GPU-accelerated View Transition fade with customizable slow timing */
     ::view-transition-image-pair(root) {
       isolation: isolate;
     }
     ::view-transition-old(root),
     ::view-transition-new(root) {
-      animation-duration: 0.38s;
+      animation-duration: ${cssDuration};
       animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
       mix-blend-mode: normal;
     }
@@ -71,8 +117,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     html.theme-transitioning,
     html.theme-transitioning body,
     html.theme-transitioning #root {
-      transition: background-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-                  color 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      transition: background-color ${cssDuration} cubic-bezier(0.16, 1, 0.3, 1),
+                  color 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     html.theme-transitioning div,
     html.theme-transitioning header,
@@ -83,13 +129,16 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     html.theme-transitioning button,
     html.theme-transitioning input,
     html.theme-transitioning textarea {
-      transition: background-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-                  border-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-                  color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-                  box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      transition: background-color ${cssDuration} cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color ${cssDuration} cubic-bezier(0.16, 1, 0.3, 1),
+                  color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow ${cssDuration} cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
   `;
 }
+
+// Initial injection with the recommended 0.85s slow cinematic duration
+injectThemeTransitionStyles('0.85s');
 
 export const THEME_COLORS = {
   light: {
@@ -167,30 +216,58 @@ const ThemeContext = createContext({
   toggleTheme: () => {},
   setTheme: () => {},
   isLoaded: false,
+  transitionSpeed: 'cinematic',
+  setTransitionSpeed: () => {},
+  speedOptions: TRANSITION_SPEED_OPTIONS,
+  currentSpeedConfig: TRANSITION_SPEED_OPTIONS.cinematic,
 });
 
 export function ThemeProvider({ children }) {
   const systemScheme = useColorScheme();
   const [theme, setThemeState] = useState('light');
+  const [transitionSpeed, setTransitionSpeedState] = useState('cinematic');
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    async function loadStoredTheme() {
+    async function loadStoredPreferences() {
       try {
-        const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (stored === 'dark' || stored === 'light') {
-          setThemeState(stored);
+        const storedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (storedTheme === 'dark' || storedTheme === 'light') {
+          setThemeState(storedTheme);
         } else if (systemScheme === 'dark') {
           setThemeState('dark');
         }
+
+        const storedSpeed = await AsyncStorage.getItem(THEME_SPEED_STORAGE_KEY);
+        if (storedSpeed && TRANSITION_SPEED_OPTIONS[storedSpeed]) {
+          setTransitionSpeedState(storedSpeed);
+          injectThemeTransitionStyles(TRANSITION_SPEED_OPTIONS[storedSpeed].cssDuration);
+        } else {
+          // Default to the recommended best slow option (cinematic 0.85s)
+          setTransitionSpeedState('cinematic');
+          injectThemeTransitionStyles(TRANSITION_SPEED_OPTIONS.cinematic.cssDuration);
+        }
       } catch (e) {
-        console.warn('Could not load theme preference:', e);
+        console.warn('Could not load theme preferences:', e);
       } finally {
         setIsLoaded(true);
       }
     }
-    loadStoredTheme();
+    loadStoredPreferences();
   }, [systemScheme]);
+
+  const currentSpeedConfig = TRANSITION_SPEED_OPTIONS[transitionSpeed] || TRANSITION_SPEED_OPTIONS.cinematic;
+
+  const setTransitionSpeed = async (speedId) => {
+    if (!TRANSITION_SPEED_OPTIONS[speedId]) return;
+    setTransitionSpeedState(speedId);
+    injectThemeTransitionStyles(TRANSITION_SPEED_OPTIONS[speedId].cssDuration);
+    try {
+      await AsyncStorage.setItem(THEME_SPEED_STORAGE_KEY, speedId);
+    } catch (e) {
+      console.warn('Could not save speed preference:', e);
+    }
+  };
 
   const performThemeSwitch = (newTheme) => {
     const valid = newTheme === 'dark' ? 'dark' : 'light';
@@ -226,7 +303,7 @@ export function ThemeProvider({ children }) {
       commitTheme();
       setTimeout(() => {
         document.documentElement.classList.remove('theme-transitioning');
-      }, 420);
+      }, currentSpeedConfig.durationMs + 60);
     } else {
       commitTheme();
     }
@@ -258,7 +335,18 @@ export function ThemeProvider({ children }) {
   }, [theme, colors]);
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, colors, toggleTheme, setTheme, isLoaded }}>
+    <ThemeContext.Provider value={{
+      theme,
+      isDark,
+      colors,
+      toggleTheme,
+      setTheme,
+      isLoaded,
+      transitionSpeed,
+      setTransitionSpeed,
+      speedOptions: TRANSITION_SPEED_OPTIONS,
+      currentSpeedConfig
+    }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -274,6 +362,10 @@ export function useTheme() {
       toggleTheme: () => {},
       setTheme: () => {},
       isLoaded: true,
+      transitionSpeed: 'cinematic',
+      setTransitionSpeed: () => {},
+      speedOptions: TRANSITION_SPEED_OPTIONS,
+      currentSpeedConfig: TRANSITION_SPEED_OPTIONS.cinematic,
     };
   }
   return context;

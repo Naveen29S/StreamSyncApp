@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, toggleTheme, transitionSpeed, setTransitionSpeed, speedOptions, currentSpeedConfig } = useTheme();
   const [activeTab, setActiveTab] = useState('Account');
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
@@ -34,7 +34,7 @@ export default function SettingsScreen() {
         
         {/* Left Sidebar Menu */}
         <View style={[styles.settingsMenu, { backgroundColor: isDark ? colors.sidebarBg : '#fafafa', borderRightColor: colors.border }]}>
-          {['Account', 'Notifications', 'Billing', 'Integrations'].map((tab) => (
+          {['Account', 'Appearance', 'Notifications', 'Billing', 'Integrations'].map((tab) => (
             <TouchableOpacity 
               key={tab} 
               style={[
@@ -123,6 +123,146 @@ export default function SettingsScreen() {
                   <Text style={styles.deleteBtnText}>Delete Account</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          )}
+
+          {activeTab === 'Appearance' && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Appearance & Theme</Text>
+              <Text style={[styles.hint, { color: colors.textSecondary, marginBottom: 24 }]}>
+                Customize your theme palette and the pacing of the Day/Night cross-dissolve fade transition.
+              </Text>
+
+              {/* Current Mode Row */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 18,
+                borderRadius: 14,
+                backgroundColor: colors.inputBg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: 28,
+              }}>
+                <View>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }}>
+                    {isDark ? '🌙 Midnight Dark Mode' : '☀️ Day Light Mode'}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                    {isDark ? 'High-contrast dark slate palette' : 'Clean crisp white and light gray palette'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={toggleTheme}
+                  style={{
+                    backgroundColor: colors.accent,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 999,
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 13 }}>
+                    Switch to {isDark ? 'Day' : 'Dark'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Transition Speed Options */}
+              <Text style={[styles.label, { color: colors.textPrimary, fontSize: 16, marginBottom: 6 }]}>
+                Fade Transition Interval / Speed Options
+              </Text>
+              <Text style={[styles.hint, { color: colors.textSecondary, marginBottom: 16 }]}>
+                Select how slowly and smoothly the screen cross-dissolves when toggling between Day and Dark mode.
+              </Text>
+
+              <View style={{ gap: 12, marginBottom: 24 }}>
+                {Object.values(speedOptions || {}).map((opt) => {
+                  const isSelected = (transitionSpeed || 'cinematic') === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      activeOpacity={0.8}
+                      onPress={() => setTransitionSpeed(opt.id)}
+                      style={{
+                        padding: 16,
+                        borderRadius: 14,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? colors.accent : colors.border,
+                        backgroundColor: isSelected 
+                          ? (isDark ? 'rgba(168, 85, 247, 0.12)' : 'rgba(157, 80, 255, 0.05)') 
+                          : colors.inputBg,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>
+                            {opt.label}
+                          </Text>
+                          {opt.badge && (
+                            <View style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              borderRadius: 999,
+                              backgroundColor: opt.isRecommended ? colors.accent : colors.badgeBg,
+                            }}>
+                              <Text style={{
+                                fontSize: 11,
+                                fontWeight: '700',
+                                color: opt.isRecommended ? '#ffffff' : colors.textSecondary,
+                              }}>
+                                {opt.badge}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+                          {opt.desc}
+                        </Text>
+                      </View>
+
+                      {/* Radio indicator */}
+                      <View style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        borderWidth: 2,
+                        borderColor: isSelected ? colors.accent : colors.borderStrong,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isSelected ? colors.accent : 'transparent',
+                      }}>
+                        {isSelected && (
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#ffffff' }} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Test Action */}
+              <TouchableOpacity
+                onPress={toggleTheme}
+                style={{
+                  backgroundColor: colors.accent,
+                  paddingHorizontal: 22,
+                  paddingVertical: 14,
+                  borderRadius: 999,
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  flexDirection: 'row',
+                  gap: 8,
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontSize: 14 }}>✨</Text>
+                <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '700' }}>
+                  Test {currentSpeedConfig?.shortLabel} Fade ({currentSpeedConfig?.durationText})
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 
