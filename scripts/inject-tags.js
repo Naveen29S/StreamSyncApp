@@ -4,6 +4,10 @@ const path = require('path');
 const distIndexPath = path.join(__dirname, '..', 'dist', 'index.html');
 
 const tagsToInject = `
+    <!-- Google Fonts: Bebas Neue & Quicksand -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-PVSVYJXVKB"></script>
     <script>
@@ -38,6 +42,22 @@ const footerToInject = `
 
 if (fs.existsSync(distIndexPath)) {
   let html = fs.readFileSync(distIndexPath, 'utf8');
+
+  if (!html.includes('Bebas+Neue')) {
+    const fontLink = `
+    <!-- Google Fonts: Bebas Neue & Quicksand -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+`;
+    if (html.includes('<head>')) {
+      html = html.replace('<head>', `<head>${fontLink}`);
+    } else if (html.includes('</head>')) {
+      html = html.replace('</head>', `${fontLink}\n  </head>`);
+    } else {
+      html = fontLink + '\n' + html;
+    }
+  }
 
   if (!html.includes('G-PVSVYJXVKB')) {
     if (html.includes('<head>')) {

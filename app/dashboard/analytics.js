@@ -205,17 +205,17 @@ export default function AnalyticsScreen() {
 
       {/* Top Metrics Row */}
       <View style={styles.topMetricsRow}>
-        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>TOTAL AUDIENCE</Text>
           <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{formatCompactNumber(data.overview.totalFollowers)}</Text>
           <Text style={styles.metricTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Unified Audience' : '—'}</Text>
         </View>
-        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ENGAGEMENT RATE</Text>
           <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{data.overview.engagementRate || '0.0%'}</Text>
           <Text style={styles.metricTrendUp}>{parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time average' : '—'}</Text>
         </View>
-        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>REVENUE (EST)</Text>
           <Text style={[styles.metricValue, { color: colors.textPrimary }, data.overview.estimatedRevenue < 0 && { fontSize: 24, marginTop: 4 }]}>
             {data.overview.estimatedRevenue < 0 
@@ -233,7 +233,7 @@ export default function AnalyticsScreen() {
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32, marginBottom: 32 }}>
         
         {/* Main Chart Area */}
-        <View style={[styles.card, { flex: 2, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 2, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Audience Growth</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Across all connected platforms</Text>
@@ -256,7 +256,7 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* Demographics Area */}
-        <View style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Demographics</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Combined audience data</Text>
@@ -302,7 +302,7 @@ export default function AnalyticsScreen() {
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32 }}>
         
         {/* Top Content */}
-        <View style={[styles.card, { flex: 1.5, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1.5, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Top Performing Content</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Based on highest engagement</Text>
@@ -342,7 +342,7 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* Platform Breakdown */}
-        <View style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Platform Breakdown</Text>
           
           <View style={styles.table}>

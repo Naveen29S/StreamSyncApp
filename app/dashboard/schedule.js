@@ -100,7 +100,7 @@ export default function ScheduleScreen() {
                 {index !== currentDayPosts.length - 1 && <View style={[styles.timeLine, { backgroundColor: colors.border }]} />}
               </View>
 
-              <View style={[styles.postCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <View dataSet={{ gridBox: 'true' }} style={[styles.postCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 <View style={[styles.cardAccent, { backgroundColor: post.color }]} />
                 <View style={styles.cardContent}>
                   <Text style={[styles.postPlatform, { color: post.color, fontWeight: '700', fontSize: 11, marginBottom: 4 }]}>{post.platform}</Text>

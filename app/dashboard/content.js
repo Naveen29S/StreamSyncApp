@@ -267,7 +267,7 @@ export default function ContentScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.grid}>
           {filteredPosts.map(post => (
-            <View key={post.id} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View key={post.id} dataSet={{ gridBox: 'true' }} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
               {post.thumbnail ? (
                 <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
               ) : (

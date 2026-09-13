@@ -226,8 +226,25 @@ export default function DashboardIndex() {
               const config = PLATFORMS[name];
               if (!config) return null;
               return (
-                <View key={name} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: config.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: config.color + '30' }}>
-                  <Image source={{ uri: config.logo }} style={{ width: 14, height: 14 }} resizeMode="contain" />
+                <View 
+                  key={name} 
+                  style={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: 16, 
+                    backgroundColor: isDark ? '#ffffff' : config.bg, 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    borderWidth: 1.5, 
+                    borderColor: isDark ? '#ffffff' : config.color + '40',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isDark ? 0.25 : 0.08,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Image source={{ uri: config.logo }} style={{ width: 18, height: 18 }} resizeMode="contain" />
                 </View>
               );
             })}
@@ -237,7 +254,7 @@ export default function DashboardIndex() {
 
       {/* ─── Aggregated Stats Row ─── */}
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Reach</Text>
             <Text style={styles.statTrendUp}>{data.overview.totalViews > 0 ? '↑ Live' : '—'}</Text>
@@ -246,7 +263,7 @@ export default function DashboardIndex() {
           <Text style={[styles.statCaption, { color: colors.textMuted }]}>Combined views across all platforms</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Audience</Text>
             <Text style={styles.statTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Active' : '—'}</Text>
@@ -255,7 +272,7 @@ export default function DashboardIndex() {
           <Text style={[styles.statCaption, { color: colors.textMuted }]}>Followers & subscribers unified</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Engagement</Text>
             <Text style={styles.statTrendUp}>
@@ -266,7 +283,7 @@ export default function DashboardIndex() {
           <Text style={[styles.statCaption, { color: colors.textMuted }]}>Average across connected platforms</Text>
         </View>
 
-        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Revenue</Text>
             {data.overview.estimatedRevenue >= 0 && (
@@ -279,9 +296,7 @@ export default function DashboardIndex() {
               : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           </Text>
           <Text style={[styles.statCaption, { color: colors.textMuted }]}>
-            {data.overview.estimatedRevenue < 0 
-              ? "Grow your audience to monetize" 
-              : "Estimated from monetized platforms"}
+            {data.overview.estimatedRevenue < 0 ? "Grow audience to unlock" : "Monthly creator revenue run-rate"}
           </Text>
         </View>
       </View>
@@ -314,20 +329,24 @@ export default function DashboardIndex() {
           }
 
           return (
-            <View key={name} style={[
-              styles.platformCard, 
-              { 
-                backgroundColor: colors.cardBg,
-                borderColor: colors.border,
-                borderTopWidth: 3, 
-                borderTopColor: config.color,
-                ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 24px rgba(0,0,0,0.5)` : `0px 8px 24px ${config.color}15` } : {})
-              }
-            ]}>
+            <View 
+              key={name} 
+              dataSet={{ gridBox: 'true' }}
+              style={[
+                styles.platformCard, 
+                { 
+                  backgroundColor: colors.cardBg,
+                  borderColor: colors.border,
+                  borderTopWidth: 3, 
+                  borderTopColor: config.color,
+                  ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 24px rgba(0,0,0,0.5)` : `0px 8px 24px ${config.color}15` } : {})
+                }
+              ]}
+            >
               {/* Platform Header */}
               <View style={styles.platformCardHeader}>
-                <View style={[styles.platformIconCircle, { backgroundColor: config.bg, padding: 0 }]}>
-                  <Image source={{ uri: config.logo }} style={{ width: 22, height: 22, tintColor: (name === 'X (Twitter)' && isDark) ? '#ffffff' : undefined }} resizeMode="contain" />
+                <View style={[styles.platformIconCircle, { backgroundColor: isDark ? '#ffffff' : config.bg, padding: 0, borderWidth: isDark ? 1 : 0, borderColor: '#ffffff' }]}>
+                  <Image source={{ uri: config.logo }} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 </View>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
@@ -483,7 +502,7 @@ export default function DashboardIndex() {
       {/* ─── Activity Stream ─── */}
       <View style={styles.twoCol}>
         {/* Recent Comments */}
-        <View style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.sectionCardHeader}>
             <Text style={[styles.sectionCardTitle, { color: colors.textPrimary }]}>Activity Feed</Text>
             <Text style={styles.sectionCardAction}>View all →</Text>
@@ -508,7 +527,7 @@ export default function DashboardIndex() {
         </View>
 
         {/* Quick Actions */}
-        <View style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View dataSet={{ gridBox: 'true' }} style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.sectionCardTitle, { color: colors.textPrimary }]}>Quick Actions</Text>
           
           <TouchableOpacity style={[styles.quickAction, { borderBottomColor: colors.border }]}>

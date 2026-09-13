@@ -129,7 +129,7 @@ export default function App() {
             { icon: '📊', title: 'Unified Analytics', desc: 'See aggregated metrics across all platforms. Compare performance side-by-side without spreadsheets.' },
             { icon: '📤', title: 'Cross-Post', desc: 'Write once, publish everywhere. Schedule and distribute content across all your connected platforms.' },
           ].map((f, i) => (
-            <View key={i} style={[styles.featureCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View key={i} dataSet={{ gridBox: 'true' }} style={[styles.featureCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
               <View style={[styles.featureIconWrap, { backgroundColor: colors.badgeBg }]}>
                 <Text style={styles.featureIcon}>{f.icon}</Text>
               </View>

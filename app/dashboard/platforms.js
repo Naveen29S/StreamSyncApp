@@ -651,14 +651,18 @@ export default function ConnectsScreen() {
             const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, platform.id));
             
             return (
-              <View key={platform.id} style={[
-                styles.card, 
-                { backgroundColor: colors.cardBg, borderColor: colors.border },
-                isConnected && [styles.cardConnected, { borderColor: isDark ? colors.accent : '#000' }]
-              ]}>
+              <View 
+                key={platform.id} 
+                dataSet={{ gridBox: 'true' }}
+                style={[
+                  styles.card, 
+                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                  isConnected && [styles.cardConnected, { borderColor: isDark ? colors.accent : '#000' }]
+                ]}
+              >
                 <View style={styles.cardLeft}>
-                  <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#1e293b' : platform.logoBg }]}>
-                    <Image source={{ uri: platform.logo }} style={[platform.logoSize || styles.logoImage, (platform.id === 'x' && isDark) ? { tintColor: '#ffffff' } : null]} resizeMode="contain" />
+                  <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#ffffff' : platform.logoBg, borderWidth: isDark ? 1 : 0, borderColor: '#ffffff' }]}>
+                    <Image source={{ uri: platform.logo }} style={[platform.logoSize || styles.logoImage]} resizeMode="contain" />
                   </View>
                   <View style={styles.platformInfo}>
                     <Text style={[styles.platformName, { color: colors.textPrimary }]}>{platform.name}</Text>

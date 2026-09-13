@@ -134,6 +134,51 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
                   color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
                   box-shadow ${cssDuration} cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
+
+    /* ─── Box Grid Borders, Outer Shadows & Glow Hover Visual Effects ─── */
+    [data-grid-box="true"],
+    .streamsync-grid-box {
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 0.28s ease !important;
+      will-change: transform, box-shadow;
+    }
+
+    /* Day Mode (Light): Professional border + layered outer elevation shadows */
+    html:not([data-theme="dark"]) [data-grid-box="true"],
+    html:not([data-theme="dark"]) .streamsync-grid-box {
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* Day Mode Hover: Lifts up (-5px), glowing white outline shadow + outer elevation */
+    html:not([data-theme="dark"]) [data-grid-box="true"]:hover,
+    html:not([data-theme="dark"]) .streamsync-grid-box:hover {
+      transform: translateY(-5px) !important;
+      border-color: #ffffff !important;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12),
+                  0 0 24px rgba(255, 255, 255, 0.95),
+                  0 0 0 2px rgba(255, 255, 255, 1) !important;
+      cursor: pointer;
+    }
+
+    /* Dark Mode: Deep border + rich obsidian outer shadow */
+    html[data-theme="dark"] [data-grid-box="true"],
+    html[data-theme="dark"] .streamsync-grid-box {
+      border: 1px solid rgba(255, 255, 255, 0.09) !important;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+    }
+
+    /* Dark Mode Hover: Lifts up (-5px), glowing dark shade halo + deep outer shadow */
+    html[data-theme="dark"] [data-grid-box="true"]:hover,
+    html[data-theme="dark"] .streamsync-grid-box:hover {
+      transform: translateY(-5px) !important;
+      border-color: rgba(255, 255, 255, 0.22) !important;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.95),
+                  0 0 30px rgba(0, 0, 0, 0.85),
+                  0 0 0 1.5px rgba(255, 255, 255, 0.18) !important;
+      cursor: pointer;
+    }
   `;
 }
 
