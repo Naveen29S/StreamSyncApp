@@ -38,7 +38,7 @@ export default function ContentScreen() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
-  const filters = ['All', 'YouTube', 'Twitch', 'X (Twitter)', 'Video', 'Image', 'Text'];
+  const filters = ['All', 'YouTube', 'Instagram', 'Twitch', 'X (Twitter)', 'Video', 'Image', 'Text'];
 
   const loadContent = async () => {
     try {
@@ -65,6 +65,15 @@ export default function ContentScreen() {
       }
       if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
         keyPlatforms.push('x');
+      }
+      if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
+        keyPlatforms.push('ig');
+      }
+      if (profileKeys.facebook || profileKeys.fb || profileKeys.fb_page || profileKeys.fb_token) {
+        keyPlatforms.push('fb');
+      }
+      if (profileKeys.linkedin || profileKeys.in || profileKeys.in_profile || profileKeys.in_token) {
+        keyPlatforms.push('in');
       }
 
       const { data: anRows } = await supabase
@@ -97,11 +106,11 @@ export default function ContentScreen() {
       if (error) throw error;
 
       const mapped = (data || [])
-        .filter(item => connectedPlatforms.includes(normalizePlatformKey(item.platform)))
+        .filter(item => platforms.includes(normalizePlatformKey(item.platform)))
         .map(item => {
           const pName = normalizePlatformName(item.platform);
           const pKey = normalizePlatformKey(item.platform);
-          const isVideo = pKey === 'yt' || (item.title && item.title.toLowerCase().includes('video'));
+          const isVideo = pKey === 'yt' || pKey === 'ig' || pKey === 'twitch' || (item.title && item.title.toLowerCase().includes('video')) || (item.title && item.title.toLowerCase().includes('reel'));
 
           return {
             id: item.id,
@@ -182,6 +191,7 @@ export default function ContentScreen() {
   const filteredPosts = posts.filter(p => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'YouTube') return p.platformKey === 'yt' || p.platform === 'YouTube';
+    if (activeFilter === 'Instagram') return p.platformKey === 'ig' || p.platform === 'Instagram';
     if (activeFilter === 'Twitch') return p.platformKey === 'twitch' || p.platform === 'Twitch';
     if (activeFilter === 'X (Twitter)' || activeFilter === 'X') return p.platformKey === 'x' || p.platform.includes('X') || p.platform.includes('Twitter');
     if (activeFilter === 'Video') return p.type === 'Video';

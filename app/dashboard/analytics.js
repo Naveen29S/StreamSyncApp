@@ -58,6 +58,15 @@ export default function AnalyticsScreen() {
     if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
       keyPlatforms.push('x');
     }
+    if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
+      keyPlatforms.push('ig');
+    }
+    if (profileKeys.facebook || profileKeys.fb || profileKeys.fb_page || profileKeys.fb_token) {
+      keyPlatforms.push('fb');
+    }
+    if (profileKeys.linkedin || profileKeys.in || profileKeys.in_profile || profileKeys.in_token) {
+      keyPlatforms.push('in');
+    }
 
     const { data: anRows } = await supabase
       .from('analytics')

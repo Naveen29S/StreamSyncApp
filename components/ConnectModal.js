@@ -465,6 +465,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     await handleInstagramConnect('DEMO', 'creators');
   }
 
+  async function handleQuickInfluencerConnect(username) {
+    setIgUsername(username);
+    setIgAccessToken('DEMO');
+    await handleInstagramConnect('DEMO', username);
+  }
+
   // Facebook
   async function handleFacebookConnect(customToken, customPage) {
     const tokenToUse = (customToken !== undefined ? customToken : fbAccessToken).trim();
@@ -1205,16 +1211,52 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
                       <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                       <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                        OR CONNECT VIA HANDLE / GRAPH TOKEN
+                        OR SYNC CREATOR & INFLUENCER HANDLE
                       </Text>
                       <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                     </View>
 
+                    {/* Influencer Quick Presets */}
+                    <View style={{ marginBottom: 4 }}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary, marginBottom: 8 }]}>POPULAR INFLUENCERS & CREATORS</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {[
+                          { label: '@creators (14.8M)', user: 'creators' },
+                          { label: '@mrbeast (62.4M)', user: 'mrbeast' },
+                          { label: '@selenagomez (428M)', user: 'selenagomez' },
+                          { label: '@natgeo (281M)', user: 'natgeo' },
+                          { label: '@virat.kohli (271M)', user: 'viratkohli' },
+                          { label: '@mkbhd (4.9M)', user: 'mkbhd' }
+                        ].map(inf => {
+                          const isSelected = (igUsername || '').toLowerCase().replace(/[@._]/g, '') === inf.user;
+                          return (
+                            <TouchableOpacity 
+                              key={inf.user}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isSelected ? '#E1306C' : colors.border,
+                                backgroundColor: isSelected ? 'rgba(225,48,108,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)')
+                              }}
+                              onPress={() => handleQuickInfluencerConnect(inf.user)}
+                              disabled={igLoading}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#E1306C' : colors.textPrimary }}>
+                                ⚡ {inf.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM USERNAME / HANDLE *</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CUSTOM INSTAGRAM USERNAME / HANDLE *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. creators, natgeo, or your handle"
+                        placeholder="e.g. creators, mrbeast, or your handle"
                         placeholderTextColor={colors.textSecondary}
                         value={igUsername}
                         onChangeText={setIgUsername}
@@ -1224,10 +1266,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
 
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM GRAPH ACCESS TOKEN (OR DEMO)</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM GRAPH ACCESS TOKEN (OPTIONAL / DEMO)</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. IGAQV... (or leave DEMO)"
+                        placeholder="Leave blank or DEMO for instant influencer sync"
                         placeholderTextColor={colors.textSecondary}
                         value={igAccessToken}
                         onChangeText={setIgAccessToken}
@@ -1258,7 +1300,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       {igLoading ? (
                         <ActivityIndicator color="#ffffff" size="small" />
                       ) : (
-                        <Text style={styles.modalPrimaryBtnText}>Connect Instagram Account</Text>
+                        <Text style={styles.modalPrimaryBtnText}>Connect & Sync Influencer Data</Text>
                       )}
                     </TouchableOpacity>
 

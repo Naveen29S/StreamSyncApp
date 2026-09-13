@@ -90,6 +90,15 @@ export default function DashboardIndex() {
     if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
       keyPlatforms.push('x');
     }
+    if (apiKeys.instagram || apiKeys.ig || apiKeys.ig_username || apiKeys.instagram_username || apiKeys.ig_token) {
+      keyPlatforms.push('ig');
+    }
+    if (apiKeys.facebook || apiKeys.fb || apiKeys.fb_page || apiKeys.fb_token) {
+      keyPlatforms.push('fb');
+    }
+    if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token) {
+      keyPlatforms.push('in');
+    }
 
     const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
 

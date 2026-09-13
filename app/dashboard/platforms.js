@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Animated, Modal, TextInput, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { connectYouTubeViaApiKey, connectTwitchViaApiKey, connectXViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, normalizePlatformKey, processSessionOAuthTokens } from '../../lib/api';
+import { connectYouTubeViaApiKey, connectTwitchViaApiKey, connectXViaApiKey, connectInstagramViaApiKey, disconnectPlatform, syncPlatformData, isPlatformMatch, normalizePlatformKey, processSessionOAuthTokens } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
@@ -41,7 +41,7 @@ const platforms = [
     logo: 'https://img.icons8.com/fluent/512/instagram-new.png', 
     logoBg: '#fff',
     logoSize: { width: 34, height: 34 },
-    description: 'Connect your Instagram business or creator account' 
+    description: 'Sync creator reels, followers, views, engagement rate & comments' 
   },
   { 
     id: 'fb', 
@@ -97,6 +97,14 @@ export default function ConnectsScreen() {
   const [xModalError, setXModalError] = useState('');
   const [xModalSuccess, setXModalSuccess] = useState('');
 
+  // Instagram modal states
+  const [igModalVisible, setIgModalVisible] = useState(false);
+  const [igUsername, setIgUsername] = useState('creators');
+  const [igAccessToken, setIgAccessToken] = useState('');
+  const [igLoading, setIgLoading] = useState(false);
+  const [igModalError, setIgModalError] = useState('');
+  const [igModalSuccess, setIgModalSuccess] = useState('');
+
   // Handle OAuth redirect errors
   useEffect(() => {
     if (params?.error) {
@@ -121,6 +129,8 @@ export default function ConnectsScreen() {
         openTwitchModal();
       } else if (params.connect === 'x') {
         openXModal();
+      } else if (params.connect === 'ig') {
+        openIgModal();
       } else {
         const plat = platforms.find(p => p.id === params.connect);
         if (plat) {
@@ -196,6 +206,15 @@ export default function ConnectsScreen() {
     if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
       keyPlatforms.push('yt');
     }
+    if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
+      keyPlatforms.push('twitch');
+    }
+    if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
+      keyPlatforms.push('x');
+    }
+    if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
+      keyPlatforms.push('ig');
+    }
 
     const { data: anRows } = await supabase
       .from('analytics')
@@ -232,6 +251,12 @@ export default function ConnectsScreen() {
         setTwitchUsername(data.api_keys.twitch_username || data.api_keys.twitch_login || 'shroud');
         setTwitchClientId(data.api_keys.twitch_client_id || '');
         setTwitchClientSecret(data.api_keys.twitch_client_secret || '');
+      }
+
+      const isIg = platforms.includes('ig');
+      if (isIg) {
+        setIgUsername(data.api_keys.ig_username || data.api_keys.instagram_username || 'creators');
+        setIgAccessToken(data.api_keys.ig || data.api_keys.ig_token || '');
       }
     } else {
       setYtApiKey('');
@@ -407,6 +432,80 @@ export default function ConnectsScreen() {
       setXModalError(e.message || 'Failed to disconnect');
     } finally {
       setXLoading(false);
+    }
+  }
+
+  function openIgModal() {
+    const rawKey = apiKeys.ig || apiKeys.ig_token || '';
+    const rawUser = apiKeys.ig_username || apiKeys.instagram_username || 'creators';
+    setIgAccessToken(rawKey);
+    setIgUsername(rawUser);
+    setIgModalError('');
+    setIgModalSuccess('');
+    setIgModalVisible(true);
+  }
+
+  async function handleInstagramConnect(customToken, customUser) {
+    const tokenToUse = customToken !== undefined ? customToken : igAccessToken;
+    const userToUse = (customUser !== undefined ? customUser : igUsername).trim();
+
+    if (!userToUse) {
+      setIgModalError('Please enter an Instagram username or handle.');
+      return;
+    }
+
+    setIgLoading(true);
+    setIgModalError('');
+    setIgModalSuccess('');
+
+    try {
+      await connectInstagramViaApiKey(userToUse, tokenToUse);
+      setIgModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
+      await fetchProfile(session.user.id);
+      setTimeout(() => {
+        setIgModalVisible(false);
+        setIgModalSuccess('');
+      }, 1200);
+    } catch (err) {
+      setIgModalError(err.message || 'Failed to connect Instagram account.');
+    } finally {
+      setIgLoading(false);
+    }
+  }
+
+  async function handleQuickInfluencerConnect(username = 'creators') {
+    setIgUsername(username);
+    await handleInstagramConnect('', username);
+  }
+
+  async function handleSyncIgNow() {
+    setIgLoading(true);
+    setIgModalError('');
+    try {
+      await syncPlatformData(['ig']);
+      setIgModalSuccess('Instagram reels & profile data refreshed successfully!');
+      setTimeout(() => setIgModalSuccess(''), 2000);
+    } catch (e) {
+      setIgModalError(e.message || 'Sync failed');
+    } finally {
+      setIgLoading(false);
+    }
+  }
+
+  async function handleDisconnectIg() {
+    setIgLoading(true);
+    try {
+      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, 'ig')));
+      setIgUsername('');
+      setIgAccessToken('');
+
+      await disconnectPlatform('ig');
+      await fetchProfile(session.user.id);
+      setIgModalVisible(false);
+    } catch (e) {
+      setIgModalError(e.message || 'Failed to disconnect');
+    } finally {
+      setIgLoading(false);
     }
   }
 
@@ -613,12 +712,17 @@ export default function ConnectsScreen() {
       openXModal();
       return;
     }
+    if (platformId === 'ig') {
+      openIgModal();
+      return;
+    }
     handleOAuthConnect(platformId);
   }
 
   const isYtConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'yt'));
   const isTwitchConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'twitch'));
   const isXConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'x'));
+  const isIgConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'ig'));
 
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -695,6 +799,7 @@ export default function ConnectsScreen() {
                         if (platform.id === 'yt') openYtModal();
                         else if (platform.id === 'twitch') openTwitchModal();
                         else if (platform.id === 'x') openXModal();
+                        else if (platform.id === 'ig') openIgModal();
                         else setManagePlatform(platform);
                       }}
                     >
@@ -1103,14 +1208,14 @@ export default function ConnectsScreen() {
                 setXModalVisible(false);
                 handleOAuthConnect('x');
               }}
-              disabled={actionLoading}
+              disabled={xLoading}
             >
               <Image 
-                source={{ uri: PLATFORMS['X (Twitter)'].logo }} 
+                source={{ uri: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png' }} 
                 style={{ width: 18, height: 18, marginRight: 10, tintColor: isDark ? '#000000' : '#ffffff' }} 
               />
               <Text style={[styles.googleOAuthBtnText, { color: isDark ? '#000000' : '#ffffff' }]}>
-                {actionLoading ? "Connecting with X..." : "Continue with X (1-Click OAuth 2.0)"}
+                {xLoading ? "Connecting with X..." : "Continue with X (1-Click OAuth 2.0)"}
               </Text>
             </TouchableOpacity>
 
@@ -1189,6 +1294,164 @@ export default function ConnectsScreen() {
                 disabled={xLoading}
               >
                 <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>⚡ Quick Demo: Test with @TwitterDev (No Token Needed)</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Instagram Connect Modal ─── */}
+      <Modal
+        visible={igModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIgModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Image 
+                  source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
+                  style={{ width: 28, height: 28 }} 
+                  resizeMode="contain" 
+                />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Connect Instagram Creator</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIgModalVisible(false)} style={[styles.modalCloseBtn, { backgroundColor: colors.badgeBg }]}>
+                <Text style={{ fontSize: 18, color: colors.textSecondary }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {isIgConnected && (
+              <View style={[styles.alreadyConnectedBox, { marginBottom: 16 }, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Instagram Creator Account Active & Synced</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+                  Connected as @{igUsername?.replace(/^@/, '') || 'creators'}. Reels, follower count, reach & community comments are live in your dashboard.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                  <TouchableOpacity 
+                    style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
+                    onPress={handleSyncIgNow}
+                    disabled={igLoading}
+                  >
+                    <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>
+                      {igLoading ? 'Syncing...' : '↻ Sync Now'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
+                    onPress={handleDisconnectIg}
+                    disabled={igLoading}
+                  >
+                    <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
+              Connect any Instagram creator or influencer profile to sync followers, reel views, engagement rate, and community comments directly into StreamSync.
+            </Text>
+
+            {/* Quick Influencer Presets */}
+            <View style={{ marginVertical: 8 }}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginBottom: 8 }]}>POPULAR INFLUENCERS (1-CLICK SYNC)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {[
+                  { handle: 'creators', label: '@creators (Official)', badge: 'Creator Hub' },
+                  { handle: 'mrbeast', label: '@mrbeast', badge: '62.4M' },
+                  { handle: 'selenagomez', label: '@selenagomez', badge: '428M' },
+                  { handle: 'natgeo', label: '@natgeo', badge: '280M' },
+                  { handle: 'viratkohli', label: '@virat.kohli', badge: '270M' },
+                  { handle: 'mkbhd', label: '@mkbhd', badge: '4.9M' },
+                ].map((inf) => (
+                  <TouchableOpacity
+                    key={inf.handle}
+                    onPress={() => handleQuickInfluencerConnect(inf.handle)}
+                    disabled={igLoading}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: colors.badgeBg,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 20,
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary }}>{inf.label}</Text>
+                    <View style={{ marginLeft: 6, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 10, color: colors.accent, fontWeight: '700' }}>{inf.badge}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                OR ENTER CUSTOM INSTAGRAM HANDLE
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            </View>
+
+            <View style={styles.tabBody}>
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM USERNAME / HANDLE *</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                  placeholder="e.g. creators, mrbeast, your_brand, or @username"
+                  placeholderTextColor={colors.textSecondary}
+                  value={igUsername}
+                  onChangeText={setIgUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM GRAPH ACCESS TOKEN (OPTIONAL)</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                  placeholder="Optional: Live Graph API Access Token (or leave empty)"
+                  placeholderTextColor={colors.textSecondary}
+                  value={igAccessToken}
+                  onChangeText={setIgAccessToken}
+                  secureTextEntry={true}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              {igModalError ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{igModalError}</Text>
+                </View>
+              ) : null}
+
+              {igModalSuccess ? (
+                <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                  <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity 
+                style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C' }]} 
+                onPress={() => handleInstagramConnect()}
+                disabled={igLoading}
+              >
+                {igLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalPrimaryBtnText}>Sync Instagram Profile & Reels</Text>
+                )}
               </TouchableOpacity>
             </View>
 
