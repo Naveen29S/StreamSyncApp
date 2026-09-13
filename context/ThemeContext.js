@@ -231,9 +231,8 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       outline: none !important;
       outline-width: 0px !important;
       outline-color: transparent !important;
-      box-shadow: 0 20px 50px rgba(255, 255, 255, 0.45),
-                  0 0 45px rgba(255, 255, 255, 0.35),
-                  0 0 20px rgba(255, 255, 255, 0.25) !important;
+      box-shadow: 0 16px 40px rgba(255, 255, 255, 0.16),
+                  0 0 24px rgba(255, 255, 255, 0.10) !important;
       cursor: pointer;
     }
   `;
