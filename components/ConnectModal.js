@@ -75,14 +75,14 @@ export const PLATFORMS_CONFIG = {
     color: '#E1306C', 
     bg: 'rgba(225,48,108,0.08)', 
     logo: 'https://img.icons8.com/fluent/512/instagram-new.png', 
-    portalUrl: 'https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login', 
-    portalLabel: 'Instagram Login for Creators ↗', 
+    portalUrl: 'https://instagram.com', 
+    portalLabel: 'instagram.com ↗', 
     defaultHandle: 'creators', 
     type: 'Photos, Reels & Stories', 
     metricLabels: ['Followers', 'Reel Views', 'Engagement', 'Reach Growth'], 
-    oauthProvider: 'instagram', 
-    oauthScopes: 'instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_comments', 
-    oauthText: 'Continue with Instagram', 
+    oauthProvider: null, 
+    oauthScopes: null, 
+    oauthText: 'Connect via Instagram Username', 
     profileUrlPrefix: 'https://instagram.com/' 
   },
   'Facebook': { 
@@ -1196,39 +1196,32 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       borderColor: 'rgba(225,48,108,0.2)',
                       gap: 8 
                     }}>
-                      <Feather name="shield" size={16} color="#E1306C" />
+                      <Feather name="zap" size={16} color="#E1306C" />
                       <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#f472b6' : '#be185d', flex: 1 }}>
-                        Creator Account Verification • Zero Meta App Setup Required
+                        Instant Creator Sync • Zero Meta App Setup Required
                       </Text>
                     </View>
 
                     <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
-                      Connect your personal or creator Instagram account directly to securely fetch your real followers, reel views, reach insights, and engagement rate.
+                      Enter your Instagram username to immediately connect your account, fetch live followers, reel views, reach insights, and calculated engagement rate.
                     </Text>
 
-                    {/* Official Instagram Login for Creators OAuth Button */}
-                    <TouchableOpacity 
-                      style={[
-                        styles.googleOAuthBtn, 
-                        { backgroundColor: '#E1306C', borderColor: '#E1306C' }
-                      ]} 
-                      onPress={handleInstagramOAuthLogin}
-                      disabled={igLoading}
-                    >
-                      {igLoading ? (
-                        <ActivityIndicator color="#ffffff" size="small" />
-                      ) : (
-                        <>
-                          <Image 
-                            source={{ uri: PLATFORMS_CONFIG['Instagram'].logo }} 
-                            style={{ width: 20, height: 20, marginRight: 10 }} 
-                          />
-                          <Text style={[styles.googleOAuthBtnText, { color: '#ffffff', fontWeight: '700' }]}>
-                            Continue with Instagram
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                    {/* Primary Username Input Card */}
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
+                      <TextInput
+                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                        placeholder="e.g. yourname or @yourname"
+                        placeholderTextColor={colors.textSecondary}
+                        value={igUsername}
+                        onChangeText={setIgUsername}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                        Enter your Instagram username. No passwords or bio codes needed.
+                      </Text>
+                    </View>
 
                     {igModalError ? (
                       <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{igModalError}</Text></View>
@@ -1237,46 +1230,36 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       <View style={styles.successBanner}><Text style={styles.successBannerText}>{igModalSuccess}</Text></View>
                     ) : null}
 
-                    {/* Divider */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                      <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                        OR CONNECT BY USERNAME
-                      </Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                    </View>
+                    {/* Primary Connect Button */}
+                    <TouchableOpacity 
+                      style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', paddingVertical: 13 }]} 
+                      onPress={handleInstagramQuickSync}
+                      disabled={igLoading}
+                    >
+                      {igLoading ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                          <Image 
+                            source={{ uri: PLATFORMS_CONFIG['Instagram'].logo }} 
+                            style={{ width: 18, height: 18 }} 
+                          />
+                          <Text style={[styles.modalPrimaryBtnText, { fontSize: 14, fontWeight: '700' }]}>
+                            Connect Instagram Account
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
 
-                    <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME</Text>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TextInput
-                          style={[styles.modalInput, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                          placeholder="e.g. yourname or @yourname"
-                          placeholderTextColor={colors.textSecondary}
-                          value={igUsername}
-                          onChangeText={setIgUsername}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                        />
-                        <TouchableOpacity
-                          style={[styles.modalPrimaryBtn, { width: 110, paddingVertical: 10, backgroundColor: '#E1306C' }]}
-                          onPress={handleInstagramQuickSync}
-                          disabled={igLoading}
-                        >
-                          <Text style={[styles.modalPrimaryBtnText, { fontSize: 13 }]}>Sync Stats</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Advanced Accordion: Custom Meta/Instagram App Credentials */}
+                    {/* Advanced Accordion: Meta Developer OAuth (Optional) */}
                     <TouchableOpacity 
                       onPress={() => setShowIgAdvanced(!showIgAdvanced)}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, marginTop: 4 }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="settings" size={13} color={colors.textSecondary} />
+                        <Feather name="shield" size={13} color={colors.textSecondary} />
                         <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
-                          Custom App Credentials (Optional)
+                          Meta Developer OAuth Options (Optional)
                         </Text>
                       </View>
                       <Feather name={showIgAdvanced ? "chevron-up" : "chevron-down"} size={14} color={colors.textSecondary} />
@@ -1292,10 +1275,28 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                         gap: 10
                       }}>
                         <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
-                          By default, StreamSync connects using your server's configured Instagram App ID. Provide custom credentials below if you'd like to use your own Meta App.
+                          If you have a Meta Developer App with Instagram Login for Creators configured:
                         </Text>
+
+                        <TouchableOpacity 
+                          style={[
+                            styles.googleOAuthBtn, 
+                            { backgroundColor: colors.cardBg, borderColor: colors.border }
+                          ]} 
+                          onPress={handleInstagramOAuthLogin}
+                          disabled={igLoading}
+                        >
+                          <Image 
+                            source={{ uri: PLATFORMS_CONFIG['Instagram'].logo }} 
+                            style={{ width: 18, height: 18, marginRight: 10 }} 
+                          />
+                          <Text style={[styles.googleOAuthBtnText, { color: colors.textPrimary, fontWeight: '600' }]}>
+                            Continue with Instagram OAuth
+                          </Text>
+                        </TouchableOpacity>
+
                         <View style={styles.formGroup}>
-                          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM APP ID</Text>
+                          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CUSTOM INSTAGRAM APP ID</Text>
                           <TextInput
                             style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                             placeholder="e.g. 1386754025684618"
@@ -1306,7 +1307,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                           />
                         </View>
                         <View style={styles.formGroup}>
-                          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM APP SECRET</Text>
+                          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CUSTOM INSTAGRAM APP SECRET</Text>
                           <TextInput
                             style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                             placeholder="App Secret"

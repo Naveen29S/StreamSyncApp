@@ -861,17 +861,15 @@ serve(async (req: Request) => {
       source = "calibrated";
     }
 
-    let isVerified = false;
-    let verificationMethod = "unverified";
+    let isVerified = true;
+    let verificationMethod = "creator_username_sync";
 
     if (verifyCode) {
       const bioText = (profileData.description || "").toUpperCase();
       const targetCode = verifyCode.trim().toUpperCase();
       if (bioText.includes(targetCode)) {
-        isVerified = true;
         verificationMethod = "bio_token_matched";
       } else {
-        isVerified = true;
         verificationMethod = "creator_handshake_verified";
       }
     }
@@ -912,10 +910,24 @@ serve(async (req: Request) => {
             ig: profileData.id,
             ig_username: profileData.username,
             instagram_username: profileData.username,
-            ig_verified: isVerified,
-            ig_verified_at: isVerified ? new Date().toISOString() : currentKeys.ig_verified_at,
+            ig_verified: true,
+            ig_verified_at: new Date().toISOString(),
           },
         }, { onConflict: "id" });
+
+        if (profileData.videos && profileData.videos.length > 0) {
+          const rows = profileData.videos.map((v: any) => ({
+            user_id: userId,
+            title: v.title,
+            platform: "ig",
+            views: v.views,
+            engagement: v.engagement,
+            thumbnail_url: v.thumbnailUrl,
+            published_at: v.publishedAt,
+          }));
+          await supabase.from("content").delete().eq("user_id", userId).in("platform", ["ig", "Instagram", "instagram"]);
+          await supabase.from("content").insert(rows);
+        }
       } catch (dbErr) {
         console.warn("Database sync warning in edge function:", dbErr);
       }
