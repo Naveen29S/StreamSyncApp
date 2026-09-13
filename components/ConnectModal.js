@@ -501,7 +501,9 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       setYtModalSuccess('');
                     }}
                   >
-                    <Image source={{ uri: pConfig.logo }} style={[{ width: 14, height: 14 }, (pConfig.id === 'x' && isDark && !isActive) ? { tintColor: '#ffffff' } : null]} resizeMode="contain" />
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: isDark ? '#ffffff' : 'transparent', justifyContent: 'center', alignItems: 'center', marginRight: 6 }}>
+                      <Image source={{ uri: pConfig.logo }} style={{ width: 14, height: 14 }} resizeMode="contain" />
+                    </View>
                     <Text style={[
                       styles.platformPickerChipText, 
                       { color: colors.textSecondary },

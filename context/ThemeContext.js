@@ -155,10 +155,11 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
     html:not([data-theme="dark"]) [data-grid-box="true"]:hover,
     html:not([data-theme="dark"]) .streamsync-grid-box:hover {
       transform: translateY(-5px) !important;
-      border-color: #ffffff !important;
+      border-color: rgba(157, 80, 255, 0.4) !important;
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12),
-                  0 0 24px rgba(255, 255, 255, 0.95),
-                  0 0 0 2px rgba(255, 255, 255, 1) !important;
+                  0 0 26px rgba(255, 255, 255, 0.98),
+                  0 0 0 2px rgba(255, 255, 255, 1),
+                  0 0 16px rgba(157, 80, 255, 0.25) !important;
       cursor: pointer;
     }
 
@@ -173,10 +174,11 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
     html[data-theme="dark"] [data-grid-box="true"]:hover,
     html[data-theme="dark"] .streamsync-grid-box:hover {
       transform: translateY(-5px) !important;
-      border-color: rgba(255, 255, 255, 0.22) !important;
+      border-color: rgba(168, 85, 247, 0.65) !important;
       box-shadow: 0 22px 48px rgba(0, 0, 0, 0.95),
-                  0 0 30px rgba(0, 0, 0, 0.85),
-                  0 0 0 1.5px rgba(255, 255, 255, 0.18) !important;
+                  0 0 32px rgba(0, 0, 0, 0.85),
+                  0 0 24px rgba(168, 85, 247, 0.35),
+                  0 0 0 1.5px rgba(168, 85, 247, 0.6) !important;
       cursor: pointer;
     }
   `;
