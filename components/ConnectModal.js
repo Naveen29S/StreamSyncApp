@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { 
   fetchPlatformData, 
@@ -10,6 +11,8 @@ import {
   connectTwitchViaApiKey, 
   connectXViaApiKey, 
   connectInstagramViaApiKey, 
+  generateInstagramVerificationCode,
+  verifyInstagramOwnership,
   connectFacebookViaApiKey, 
   connectLinkedInViaApiKey, 
   disconnectPlatform 
@@ -150,7 +153,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [xModalSuccess, setXModalSuccess] = useState('');
 
   // Instagram modal states
-  const [igUsername, setIgUsername] = useState('creators');
+  const [igUsername, setIgUsername] = useState('');
+  const [igStep, setIgStep] = useState('input'); // 'input' | 'verify'
+  const [igVerifyCode, setIgVerifyCode] = useState('');
+  const [igCodeCopied, setIgCodeCopied] = useState(false);
   const [igLoading, setIgLoading] = useState(false);
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
@@ -267,6 +273,8 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       setXModalSuccess('');
       setIgModalError('');
       setIgModalSuccess('');
+      setIgStep('input');
+      setIgCodeCopied(false);
       setFbModalError('');
       setFbModalSuccess('');
       setInModalError('');
@@ -415,12 +423,23 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  // Instagram
-  async function handleInstagramConnect(customToken, customUser) {
-    const userToUse = (customUser !== undefined ? customUser : igUsername).trim();
+  // Instagram 2-Step Creator Account Verification
+  function handleProceedToIgVerify() {
+    const clean = (igUsername || '').trim().replace(/^@/, '');
+    if (!clean) {
+      setIgModalError('Please enter your Instagram username or handle.');
+      return;
+    }
+    setIgModalError('');
+    const code = generateInstagramVerificationCode(clean, user?.id || 'creator');
+    setIgVerifyCode(code);
+    setIgStep('verify');
+  }
 
-    if (!userToUse) {
-      setIgModalError('Please enter an Instagram username or handle.');
+  async function handleVerifyIgOwnership() {
+    const clean = (igUsername || '').trim().replace(/^@/, '');
+    if (!clean) {
+      setIgModalError('Please enter your Instagram username or handle.');
       return;
     }
 
@@ -428,8 +447,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setIgModalError('');
     setIgModalSuccess('');
     try {
-      const data = await connectInstagramViaApiKey(userToUse);
-      setIgModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
+      await verifyInstagramOwnership({
+        username: clean,
+        code: igVerifyCode,
+        userId: user?.id
+      });
+      setIgModalSuccess(`Successfully verified & connected @${clean}!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
@@ -437,15 +460,18 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         onClose();
       }, 1200);
     } catch (err) {
-      setIgModalError(err.message || 'Failed to connect Instagram account.');
+      setIgModalError(err.message || 'Failed to verify Instagram account ownership.');
     } finally {
       setIgLoading(false);
     }
   }
 
-  async function handleQuickInfluencerConnect(username) {
-    setIgUsername(username);
-    await handleInstagramConnect('', username);
+  function handleCopyIgCode(code) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+    }
+    setIgCodeCopied(true);
+    setTimeout(() => setIgCodeCopied(false), 2000);
   }
 
   // Facebook
@@ -1131,85 +1157,179 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   </View>
                 ) : selectedPlatform === 'Instagram' ? (
                   <View style={{ gap: 14 }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
-                      Connect any Instagram creator or influencer profile to sync followers, reel views, engagement rates, and comments directly via StreamSync API.
-                    </Text>
+                    {/* Header badge */}
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      backgroundColor: 'rgba(225,48,108,0.08)', 
+                      paddingVertical: 8, 
+                      paddingHorizontal: 12, 
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: 'rgba(225,48,108,0.2)',
+                      gap: 8 
+                    }}>
+                      <Feather name="shield" size={16} color="#E1306C" />
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#f472b6' : '#be185d', flex: 1 }}>
+                        Creator Account Verification • Zero Meta App Setup Required
+                      </Text>
+                    </View>
 
-                    {/* Influencer Quick Presets */}
-                    <View style={{ marginBottom: 4 }}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary, marginBottom: 8 }]}>POPULAR INFLUENCERS & CREATORS</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {[
-                          { label: '@creators (14.8M)', user: 'creators' },
-                          { label: '@mrbeast (62.4M)', user: 'mrbeast' },
-                          { label: '@selenagomez (428M)', user: 'selenagomez' },
-                          { label: '@natgeo (281M)', user: 'natgeo' },
-                          { label: '@virat.kohli (271M)', user: 'viratkohli' },
-                          { label: '@mkbhd (4.9M)', user: 'mkbhd' }
-                        ].map(inf => {
-                          const isSelected = (igUsername || '').toLowerCase().replace(/[@._]/g, '') === inf.user;
-                          return (
+                    {igStep === 'input' ? (
+                      /* STEP 1: Enter your Instagram handle */
+                      <View style={{ gap: 14 }}>
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
+                          Connect your personal or creator Instagram account to display your live followers, reel views, engagement rate, and audience analytics.
+                        </Text>
+
+                        <View style={styles.formGroup}>
+                          <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM HANDLE / USERNAME *</Text>
+                          <TextInput
+                            style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                            placeholder="e.g. yourhandle or @youraccount"
+                            placeholderTextColor={colors.textSecondary}
+                            value={igUsername}
+                            onChangeText={setIgUsername}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                          />
+                          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                            Enter your own Instagram account handle without passwords.
+                          </Text>
+                        </View>
+
+                        {igModalError ? (
+                          <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{igModalError}</Text></View>
+                        ) : null}
+                        {igModalSuccess ? (
+                          <View style={styles.successBanner}><Text style={styles.successBannerText}>{igModalSuccess}</Text></View>
+                        ) : null}
+
+                        <TouchableOpacity 
+                          style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C' }]} 
+                          onPress={handleProceedToIgVerify}
+                        >
+                          <Text style={styles.modalPrimaryBtnText}>Proceed to Verification →</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      /* STEP 2: Verify Account Ownership */
+                      <View style={{ gap: 14 }}>
+                        {/* Selected Account Bar */}
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: colors.badgeBg,
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: colors.border
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Feather name="at-sign" size={15} color="#E1306C" />
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                              @{igUsername.replace(/^@/, '')}
+                            </Text>
+                          </View>
+                          <TouchableOpacity 
+                            onPress={() => { setIgStep('input'); setIgModalError(''); }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>Change handle</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Security Verification Code Box */}
+                        <View style={{
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          padding: 14,
+                          alignItems: 'center'
+                        }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
+                            Your Creator Verification Code
+                          </Text>
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 12,
+                            backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : '#ffffff',
+                            paddingVertical: 8,
+                            paddingHorizontal: 16,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#E1306C'
+                          }}>
+                            <Text style={{ fontSize: 20, fontWeight: '900', color: '#E1306C', letterSpacing: 2 }}>
+                              {igVerifyCode}
+                            </Text>
                             <TouchableOpacity 
-                              key={inf.user}
+                              onPress={() => handleCopyIgCode(igVerifyCode)}
                               style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isSelected ? '#E1306C' : colors.border,
-                                backgroundColor: isSelected ? 'rgba(225,48,108,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)')
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: igCodeCopied ? '#22c55e' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'),
+                                paddingVertical: 4,
+                                paddingHorizontal: 8,
+                                borderRadius: 6,
+                                gap: 4
                               }}
-                              onPress={() => handleQuickInfluencerConnect(inf.user)}
-                              disabled={igLoading}
                             >
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#E1306C' : colors.textPrimary }}>
-                                {inf.label}
+                              <Feather name={igCodeCopied ? "check" : "copy"} size={12} color={igCodeCopied ? "#fff" : colors.textPrimary} />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: igCodeCopied ? "#fff" : colors.textPrimary }}>
+                                {igCodeCopied ? "Copied!" : "Copy"}
                               </Text>
                             </TouchableOpacity>
-                          );
-                        })}
+                          </View>
+                        </View>
+
+                        {/* Verification Steps Instructions */}
+                        <View style={{ gap: 6, paddingHorizontal: 2 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }}>
+                            Quick Verification Options:
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                            1. Add <Text style={{ fontWeight: '700', color: '#E1306C' }}>{igVerifyCode}</Text> to your Instagram bio (you can remove it after verification).
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                            2. Or tap below to complete a 1-click creator handshake check.
+                          </Text>
+                        </View>
+
+                        {igModalError ? (
+                          <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{igModalError}</Text></View>
+                        ) : null}
+                        {igModalSuccess ? (
+                          <View style={styles.successBanner}><Text style={styles.successBannerText}>{igModalSuccess}</Text></View>
+                        ) : null}
+
+                        <TouchableOpacity 
+                          style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C' }]} 
+                          onPress={handleVerifyIgOwnership}
+                          disabled={igLoading}
+                        >
+                          {igLoading ? (
+                            <ActivityIndicator color="#ffffff" size="small" />
+                          ) : (
+                            <Text style={styles.modalPrimaryBtnText}>Verify Ownership & Connect Account</Text>
+                          )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          style={{ alignSelf: 'center', paddingVertical: 6 }} 
+                          onPress={() => { setIgStep('input'); setIgModalError(''); }}
+                          disabled={igLoading}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                            ← Back to Handle Input
+                          </Text>
+                        </TouchableOpacity>
                       </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                      <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                        OR ENTER INSTAGRAM USERNAME / HANDLE
-                      </Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                    </View>
-
-                    <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM USERNAME / HANDLE *</Text>
-                      <TextInput
-                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. creators, mrbeast, or your handle"
-                        placeholderTextColor={colors.textSecondary}
-                        value={igUsername}
-                        onChangeText={setIgUsername}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
-
-                    {igModalError ? (
-                      <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{igModalError}</Text></View>
-                    ) : null}
-                    {igModalSuccess ? (
-                      <View style={styles.successBanner}><Text style={styles.successBannerText}>{igModalSuccess}</Text></View>
-                    ) : null}
-
-                    <TouchableOpacity 
-                      style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C' }]} 
-                      onPress={() => handleInstagramConnect()}
-                      disabled={igLoading}
-                    >
-                      {igLoading ? (
-                        <ActivityIndicator color="#ffffff" size="small" />
-                      ) : (
-                        <Text style={styles.modalPrimaryBtnText}>Connect & Sync Influencer Data</Text>
-                      )}
-                    </TouchableOpacity>
+                    )}
                   </View>
                 ) : selectedPlatform === 'Facebook' ? (
                   <View style={{ gap: 14 }}>

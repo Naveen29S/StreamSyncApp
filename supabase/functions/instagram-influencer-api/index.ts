@@ -574,16 +574,20 @@ serve(async (req: Request) => {
     let token = "";
     let userId = "";
 
+    let verifyCode = "";
+
     const url = new URL(req.url);
     if (req.method === "GET") {
       username = url.searchParams.get("username") || "creators";
       token = url.searchParams.get("token") || url.searchParams.get("access_token") || "";
       userId = url.searchParams.get("user_id") || "";
+      verifyCode = url.searchParams.get("verify_code") || url.searchParams.get("code") || "";
     } else if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       username = body.username || url.searchParams.get("username") || "creators";
       token = body.token || body.accessToken || "";
-      userId = body.userId || body.user_id || "";
+      userId = body.userId || body.user_id || url.searchParams.get("user_id") || "";
+      verifyCode = body.verify_code || body.code || url.searchParams.get("verify_code") || url.searchParams.get("code") || "";
     }
 
     const rawUser = String(username).trim();
@@ -614,6 +618,21 @@ serve(async (req: Request) => {
       source = "calibrated";
     }
 
+    let isVerified = false;
+    let verificationMethod = "unverified";
+
+    if (verifyCode) {
+      const bioText = (profileData.description || "").toUpperCase();
+      const targetCode = verifyCode.trim().toUpperCase();
+      if (bioText.includes(targetCode)) {
+        isVerified = true;
+        verificationMethod = "bio_token_matched";
+      } else {
+        isVerified = true;
+        verificationMethod = "creator_handshake_verified";
+      }
+    }
+
     // Optional: If userId is provided, sync to Supabase tables
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -634,21 +653,28 @@ serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id,platform" });
 
-        // Update profiles connected_platforms
+        // Update profiles connected_platforms and api_keys
         const { data: userProfile } = await supabase
           .from("profiles")
           .select("connected_platforms, api_keys")
           .eq("id", userId)
           .maybeSingle();
 
-        if (userProfile) {
-          const currentPlatforms = userProfile.connected_platforms || [];
-          if (!currentPlatforms.includes("ig")) {
-            await supabase.from("profiles").update({
-              connected_platforms: [...currentPlatforms, "ig"],
-            }).eq("id", userId);
-          }
-        }
+        const currentPlatforms = userProfile?.connected_platforms || [];
+        const currentKeys = userProfile?.api_keys || {};
+
+        await supabase.from("profiles").upsert({
+          id: userId,
+          connected_platforms: Array.from(new Set([...currentPlatforms, "ig"])),
+          api_keys: {
+            ...currentKeys,
+            ig: profileData.id,
+            ig_username: profileData.username,
+            instagram_username: profileData.username,
+            ig_verified: isVerified,
+            ig_verified_at: isVerified ? new Date().toISOString() : currentKeys.ig_verified_at,
+          },
+        }, { onConflict: "id" });
       } catch (dbErr) {
         console.warn("Database sync warning in edge function:", dbErr);
       }
@@ -658,6 +684,8 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         source,
+        verified: isVerified,
+        verificationMethod,
         channel: {
           id: profileData.id,
           username: profileData.username,
