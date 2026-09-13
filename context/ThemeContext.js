@@ -163,22 +163,23 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       cursor: pointer;
     }
 
-    /* Dark Mode: Deep border + rich obsidian outer shadow */
+    /* Dark Mode: Crisp border + pure luminous white outer shadows */
     html[data-theme="dark"] [data-grid-box="true"],
     html[data-theme="dark"] .streamsync-grid-box {
-      border: 1px solid rgba(255, 255, 255, 0.09) !important;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+      border: 1px solid rgba(255, 255, 255, 0.14) !important;
+      box-shadow: 0 4px 24px rgba(255, 255, 255, 0.09),
+                  0 1px 6px rgba(255, 255, 255, 0.06),
+                  0 0 0 1px rgba(255, 255, 255, 0.08) !important;
     }
 
-    /* Dark Mode Hover: Lifts up (-5px), glowing dark shade halo + deep outer shadow */
+    /* Dark Mode Hover: Lifts up (-5px), glowing radiant white shadow + luminous outline */
     html[data-theme="dark"] [data-grid-box="true"]:hover,
     html[data-theme="dark"] .streamsync-grid-box:hover {
       transform: translateY(-5px) !important;
-      border-color: rgba(168, 85, 247, 0.65) !important;
-      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.95),
-                  0 0 32px rgba(0, 0, 0, 0.85),
-                  0 0 24px rgba(168, 85, 247, 0.35),
-                  0 0 0 1.5px rgba(168, 85, 247, 0.6) !important;
+      border-color: rgba(255, 255, 255, 0.85) !important;
+      box-shadow: 0 18px 40px rgba(255, 255, 255, 0.18),
+                  0 0 30px rgba(255, 255, 255, 0.35),
+                  0 0 0 2px rgba(255, 255, 255, 0.9) !important;
       cursor: pointer;
     }
   `;
@@ -249,8 +250,8 @@ export const THEME_COLORS = {
     badgeBg: '#1e293b',
     badgeText: '#cbd5e1',
     cardShadow: Platform.OS === 'web' 
-      ? { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)' } 
-      : { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6 },
+      ? { boxShadow: '0 8px 24px rgba(255, 255, 255, 0.08)' } 
+      : { shadowColor: '#ffffff', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 6 },
     glowA: 'rgba(168, 85, 247, 0.22)',
     glowB: 'rgba(56, 189, 248, 0.18)',
   }

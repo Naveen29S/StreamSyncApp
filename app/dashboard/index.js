@@ -339,7 +339,7 @@ export default function DashboardIndex() {
                   borderColor: colors.border,
                   borderTopWidth: 3, 
                   borderTopColor: config.color,
-                  ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 24px rgba(0,0,0,0.5)` : `0px 8px 24px ${config.color}15` } : {})
+                  ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 24px rgba(255, 255, 255, 0.08)` : `0px 8px 24px ${config.color}15` } : {})
                 }
               ]}
             >
