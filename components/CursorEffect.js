@@ -1,16 +1,13 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 export default function CursorEffect() {
   if (Platform.OS !== 'web') return null;
 
   useEffect(() => {
-    // Inject global CSS to hide default cursor
+    // Inject global CSS for subtle trailing aura without hiding the system cursor
     const style = document.createElement('style');
     style.innerHTML = `
-      * { cursor: none !important; }
-      a, button, [role="button"] { cursor: none !important; }
       .custom-cursor-wrapper {
         position: fixed;
         top: 0; left: 0;

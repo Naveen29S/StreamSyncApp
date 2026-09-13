@@ -17,34 +17,36 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      // Globally apply the font to all Text and TextInput components
-      if (Text.defaultProps == null) Text.defaultProps = {};
-      Text.defaultProps.style = { fontFamily: 'BebasNeue' };
-      
-      if (TextInput.defaultProps == null) TextInput.defaultProps = {};
-      TextInput.defaultProps.style = { fontFamily: 'BebasNeue' };
+      try {
+        if (Text.defaultProps == null) Text.defaultProps = {};
+        Text.defaultProps.style = { fontFamily: 'BebasNeue' };
+        
+        if (TextInput.defaultProps == null) TextInput.defaultProps = {};
+        TextInput.defaultProps.style = { fontFamily: 'BebasNeue' };
+      } catch (_) {}
 
       // Foolproof CSS injection for Web to apply Bebas Neue across the entire website
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        const style = document.createElement('style');
-        style.type = 'text/css';
-        style.appendChild(document.createTextNode(`
-          @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Quicksand:wght@400;500;600;700&display=swap');
+        const STYLE_ID = 'streamsync-font-styles';
+        let style = document.getElementById(STYLE_ID);
+        if (!style) {
+          style = document.createElement('style');
+          style.id = STYLE_ID;
+          style.type = 'text/css';
+          style.appendChild(document.createTextNode(`
+            @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Quicksand:wght@400;500;600;700&display=swap');
 
-          html, body, #root, div, span, p, a, input, button, textarea {
-            font-family: 'Bebas Neue', 'Quicksand-SemiBold', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            letter-spacing: 0.6px;
-          }
-        `));
-        document.head.appendChild(style);
+            html, body, #root, div, span, p, a, input, button, textarea {
+              font-family: 'Bebas Neue', 'Quicksand-SemiBold', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              letter-spacing: 0.6px;
+            }
+          `));
+          document.head.appendChild(style);
+        }
       }
-    }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null; // Or a loading spinner
-  }
+  // NEVER block rendering with return null (avoids white-screen freeze on web/mobile)
 
   return (
     <ThemeProvider>

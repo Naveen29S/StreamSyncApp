@@ -1,13 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions, Image, Linking } from 'react-native';
-import { Link } from 'expo-router';
-import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
 const { width } = Dimensions.get('window');
 
 export default function App() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
 
   return (
@@ -40,21 +40,25 @@ export default function App() {
           {/* Day / Dark Mode Toggle in Top-Right Corner */}
           <ThemeToggle size="small" style={{ marginRight: 6 }} />
 
-          <Link href="/auth?mode=signin" asChild>
-            <TouchableOpacity style={styles.signInButton}>
-              <Text style={[styles.signInText, { color: colors.textPrimary }]}>Sign In</Text>
-            </TouchableOpacity>
-          </Link>
-          <Link href="/auth?mode=signup" asChild>
-            <TouchableOpacity style={[styles.navButton, { backgroundColor: colors.btnPrimaryBg }]}>
-              <Text style={[styles.navButtonText, { color: colors.btnPrimaryText }]}>Get Started</Text>
-            </TouchableOpacity>
-          </Link>
+          <TouchableOpacity 
+            style={styles.signInButton}
+            onPress={() => router.push('/auth?mode=signin')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.signInText, { color: colors.textPrimary }]}>Sign In</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.navButton, { backgroundColor: colors.btnPrimaryBg }]}
+            onPress={() => router.push('/auth?mode=signup')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.navButtonText, { color: colors.btnPrimaryText }]}>Get Started</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── Hero Section ─── */}
-      <Animated.View entering={FadeInDown.duration(800)} style={styles.heroSection}>
+      <View style={styles.heroSection}>
         <View style={[styles.heroPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: colors.border }]}>
           <View style={[styles.heroPillDot, { backgroundColor: colors.accent }]} />
           <Text style={[styles.heroPillText, { color: colors.textPrimary }]}>Multi-platform syncing for creators</Text>
@@ -67,20 +71,24 @@ export default function App() {
         </Text>
 
         <View style={styles.heroCTA}>
-          <Link href="/auth?mode=signup" asChild>
-            <TouchableOpacity style={[styles.heroButton, { backgroundColor: colors.btnPrimaryBg }]}>
-              <Text style={[styles.heroButtonText, { color: colors.btnPrimaryText }]}>START SYNCING →</Text>
-            </TouchableOpacity>
-          </Link>
-          <Link href="/auth?mode=signin" asChild>
-            <TouchableOpacity style={[styles.heroButtonOutline, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'transparent' }]}>
-              <Text style={[styles.heroButtonOutlineText, { color: colors.textPrimary }]}>Sign In</Text>
-            </TouchableOpacity>
-          </Link>
+          <TouchableOpacity 
+            style={[styles.heroButton, { backgroundColor: colors.btnPrimaryBg }]}
+            onPress={() => router.push('/auth?mode=signup')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.heroButtonText, { color: colors.btnPrimaryText }]}>START SYNCING →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.heroButtonOutline, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'transparent' }]}
+            onPress={() => router.push('/auth?mode=signin')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.heroButtonOutlineText, { color: colors.textPrimary }]}>Sign In</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ─── Dashboard Preview ─── */}
-        <Animated.View entering={FadeInUp.delay(300).duration(1000)} style={styles.previewContainer}>
+        <View style={styles.previewContainer}>
           <View style={[styles.previewWindow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
             {/* Title bar */}
             <View style={[styles.previewTitleBar, { backgroundColor: isDark ? '#131c2e' : '#f8f8f8', borderBottomColor: colors.border }]}>
@@ -113,11 +121,11 @@ export default function App() {
               </View>
             </View>
           </View>
-        </Animated.View>
-      </Animated.View>
+        </View>
+      </View>
 
       {/* ─── Features Section ─── */}
-      <Animated.View entering={FadeIn.delay(600).duration(1000)} style={styles.featuresSection}>
+      <View style={styles.featuresSection}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Built for multi-platform creators</Text>
         <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
           Stop switching between 5 different dashboards. StreamSync brings everything together.
@@ -138,7 +146,7 @@ export default function App() {
             </View>
           ))}
         </View>
-      </Animated.View>
+      </View>
 
       {/* ─── Footer ─── */}
       <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.cardBg }]}>

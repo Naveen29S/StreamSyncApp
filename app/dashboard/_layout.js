@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput, Image } from 'react-native';
-import { Slot, useRouter, usePathname, Link } from 'expo-router';
+import { Slot, useRouter, usePathname } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch, syncPlatformData } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -273,44 +273,49 @@ export default function DashboardLayout() {
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
               return (
-                <Link href={item.path} key={item.id} asChild>
-                  <TouchableOpacity style={StyleSheet.flatten([
+                <TouchableOpacity 
+                  key={item.id}
+                  style={[
                     styles.navItem, 
                     isActive && [styles.navItemActive, { backgroundColor: colors.badgeBg }]
-                  ])}>
-                    <View style={styles.navIconContainer}>
-                      <Feather name={item.icon} size={18} color={isActive ? colors.textPrimary : colors.textSecondary} />
-                    </View>
-                    <Text style={[
-                      styles.navLabel, 
-                      { color: colors.textSecondary },
-                      isActive && [{ color: colors.textPrimary, fontWeight: '700' }]
-                    ]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                </Link>
+                  ]}
+                  onPress={() => router.push(item.path)}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.navIconContainer}>
+                    <Feather name={item.icon} size={18} color={isActive ? colors.textPrimary : colors.textSecondary} />
+                  </View>
+                  <Text style={[
+                    styles.navLabel, 
+                    { color: colors.textSecondary },
+                    isActive && [{ color: colors.textPrimary, fontWeight: '700' }]
+                  ]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
               );
             })}
           </View>
 
           {/* Bottom */}
           <View style={styles.sidebarBottom}>
-            <Link href="/dashboard/settings" asChild>
-              <TouchableOpacity style={StyleSheet.flatten([
+            <TouchableOpacity 
+              style={[
                 styles.navItem, 
                 pathname.startsWith('/dashboard/settings') && [styles.navItemActive, { backgroundColor: colors.badgeBg }]
-              ])}>
-                <View style={styles.navIconContainer}>
-                  <Feather name="settings" size={18} color={pathname.startsWith('/dashboard/settings') ? colors.textPrimary : colors.textSecondary} />
-                </View>
-                <Text style={[
-                  styles.navLabel, 
-                  { color: colors.textSecondary },
-                  pathname.startsWith('/dashboard/settings') && [{ color: colors.textPrimary, fontWeight: '700' }]
-                ]}>Settings</Text>
-              </TouchableOpacity>
-            </Link>
+              ]}
+              onPress={() => router.push('/dashboard/settings')}
+              accessibilityRole="button"
+            >
+              <View style={styles.navIconContainer}>
+                <Feather name="settings" size={18} color={pathname.startsWith('/dashboard/settings') ? colors.textPrimary : colors.textSecondary} />
+              </View>
+              <Text style={[
+                styles.navLabel, 
+                { color: colors.textSecondary },
+                pathname.startsWith('/dashboard/settings') && [{ color: colors.textPrimary, fontWeight: '700' }]
+              ]}>Settings</Text>
+            </TouchableOpacity>
             
             <TouchableOpacity style={styles.navItem} onPress={handleSignOut}>
               <View style={styles.navIconContainer}>

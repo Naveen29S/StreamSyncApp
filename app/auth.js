@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, Dimensions, Alert, Image, Linking } from 'react-native';
-import { Link, useRouter, useLocalSearchParams } from 'expo-router';
-import Animated, { FadeInUp, FadeIn, Layout } from 'react-native-reanimated';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
@@ -170,44 +169,46 @@ export default function AuthScreen() {
         alignItems: 'center',
         zIndex: 20,
       }}>
-        <Link href="/" asChild>
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Back to Home</Text>
-          </TouchableOpacity>
-        </Link>
+        <TouchableOpacity 
+          style={[styles.backButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          onPress={() => router.push('/')}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.backText, { color: colors.textSecondary }]}>← Back to Home</Text>
+        </TouchableOpacity>
         <ThemeToggle size="small" />
       </View>
 
       {/* Brand */}
-      <Animated.View entering={FadeInUp.duration(600)} style={[styles.brandRow, { marginTop: 40 }]}>
+      <View style={[styles.brandRow, { marginTop: 40 }]}>
         <Image
           source={require('../assets/logo-mark.png')}
           style={styles.authLogoIcon}
           resizeMode="contain"
         />
         <Text style={[styles.authBrandName, { color: colors.textPrimary }]}>StreamSync</Text>
-      </Animated.View>
+      </View>
 
       {/* Auth Card */}
-      <Animated.View layout={Layout.springify()} entering={FadeInUp.delay(100).duration(800)} style={[styles.authCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-        <Animated.Text layout={Layout.springify()} style={[styles.title, { color: colors.textPrimary }]}>
+      <View style={[styles.authCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
           {isSignUp ? 'Create Account' : 'Welcome Back'}
-        </Animated.Text>
-        <Animated.Text layout={Layout.springify()} style={[styles.subtitle, { color: colors.textSecondary }]}>
+        </Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           {isSignUp ? 'Join StreamSync and sync your platforms.' : 'Sign in to your creator hub.'}
-        </Animated.Text>
+        </Text>
 
         {/* Alerts */}
         {authError ? (
-          <Animated.View entering={FadeInUp} style={styles.authAlertError}>
+          <View style={styles.authAlertError}>
             <Text style={styles.authAlertText}>{authError}</Text>
-          </Animated.View>
+          </View>
         ) : null}
 
         {authSuccess ? (
-          <Animated.View entering={FadeInUp} style={styles.authAlertSuccess}>
+          <View style={styles.authAlertSuccess}>
             <Text style={styles.authAlertSuccessText}>{authSuccess}</Text>
-          </Animated.View>
+          </View>
         ) : null}
 
         {/* Continue with Google */}
@@ -261,14 +262,14 @@ export default function AuthScreen() {
             }}
           />
           {passwordError ? (
-            <Animated.Text entering={FadeInUp} style={styles.errorText}>
+            <Text style={styles.errorText}>
               {passwordError}
-            </Animated.Text>
+            </Text>
           ) : null}
         </View>
 
         {isSignUp && (
-          <Animated.View entering={FadeInUp} style={styles.inputContainer}>
+          <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>DATE OF BIRTH</Text>
             {Platform.OS === 'web' ? (
               <input 
@@ -297,7 +298,7 @@ export default function AuthScreen() {
                 onChangeText={setDob}
               />
             )}
-          </Animated.View>
+          </View>
         )}
 
         <TouchableOpacity 
@@ -320,7 +321,7 @@ export default function AuthScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
