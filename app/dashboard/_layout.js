@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput, Image } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch, syncPlatformData } from '../../lib/api';
+import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch, syncPlatformData, exchangeInstagramOAuthCode } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -103,6 +103,27 @@ export default function DashboardLayout() {
       if (session) {
         if (session.provider_token) {
           await processSessionOAuthTokens(session);
+        }
+        if (typeof window !== 'undefined' && window.location?.search) {
+          const sp = new URLSearchParams(window.location.search);
+          const igCode = sp.get('code');
+          const igState = sp.get('state');
+          if (igCode && (igState === 'instagram_oauth' || sp.get('connect') === 'ig')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            try {
+              const storedClientId = window.localStorage?.getItem('streamsync_ig_client_id') || undefined;
+              const storedClientSecret = window.localStorage?.getItem('streamsync_ig_client_secret') || undefined;
+              await exchangeInstagramOAuthCode({
+                code: igCode,
+                redirectUri: `${window.location.origin}/dashboard/platforms`,
+                userId: session.user.id,
+                clientId: storedClientId,
+                clientSecret: storedClientSecret,
+              });
+            } catch (igErr) {
+              console.warn('Instagram code exchange in layout notice:', igErr.message);
+            }
+          }
         }
         const platforms = await fetchActivePlatforms(session);
         if (isMounted) {

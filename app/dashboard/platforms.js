@@ -6,7 +6,8 @@ import {
   connectTwitchViaApiKey, 
   connectXViaApiKey, 
   connectInstagramViaApiKey, 
-  generateInstagramVerificationCode,
+  getInstagramOAuthUrl,
+  exchangeInstagramOAuthCode,
   verifyInstagramOwnership,
   disconnectPlatform, 
   syncPlatformData, 
@@ -112,9 +113,9 @@ export default function ConnectsScreen() {
   // Instagram modal states
   const [igModalVisible, setIgModalVisible] = useState(false);
   const [igUsername, setIgUsername] = useState('');
-  const [igStep, setIgStep] = useState('input'); // 'input' | 'verify'
-  const [igVerifyCode, setIgVerifyCode] = useState('');
-  const [igCodeCopied, setIgCodeCopied] = useState(false);
+  const [igClientId, setIgClientId] = useState('');
+  const [igClientSecret, setIgClientSecret] = useState('');
+  const [showIgAdvanced, setShowIgAdvanced] = useState(false);
   const [igLoading, setIgLoading] = useState(false);
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
@@ -180,6 +181,62 @@ export default function ConnectsScreen() {
       }
     }
   }, [params?.error, params?.connect]);
+
+  // Catch returning Instagram OAuth redirect (?code=...&state=instagram_oauth)
+  useEffect(() => {
+    async function checkInstagramOAuthCallback() {
+      if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      const errorReason = searchParams.get('error_reason') || searchParams.get('error_description');
+
+      if (error && (state === 'instagram_oauth' || searchParams.get('connect') === 'ig')) {
+        setOauthError(`Instagram authorization error: ${errorReason || error}`);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      if (code && (state === 'instagram_oauth' || searchParams.get('connect') === 'ig' || !searchParams.has('provider'))) {
+        try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          const userId = currentSession?.user?.id;
+          if (!userId) {
+            console.warn("Instagram OAuth callback detected, waiting for user session...");
+            return;
+          }
+
+          // Clean up URL immediately
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          const storedClientId = window.localStorage?.getItem('streamsync_ig_client_id') || undefined;
+          const storedClientSecret = window.localStorage?.getItem('streamsync_ig_client_secret') || undefined;
+          const redirectUri = `${window.location.origin}/dashboard/platforms`;
+
+          const result = await exchangeInstagramOAuthCode({
+            code,
+            redirectUri,
+            userId,
+            clientId: storedClientId,
+            clientSecret: storedClientSecret,
+          });
+
+          if (result.success) {
+            await fetchProfile(userId);
+            setIgModalSuccess(`Successfully connected @${result.channel?.username || 'Instagram Creator'}!`);
+            setTimeout(() => setIgModalSuccess(''), 4000);
+          }
+        } catch (exchangeErr) {
+          console.error("Instagram OAuth exchange failed:", exchangeErr);
+          setOauthError(exchangeErr.message || "Failed to connect Instagram account.");
+        }
+      }
+    }
+
+    checkInstagramOAuthCallback();
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -475,46 +532,47 @@ export default function ConnectsScreen() {
   function openIgModal() {
     const rawUser = apiKeys.ig_username || apiKeys.instagram_username || '';
     setIgUsername(rawUser);
-    setIgStep(rawUser ? 'verify' : 'input');
-    if (rawUser && session?.user?.id) {
-      setIgVerifyCode(generateInstagramVerificationCode(rawUser, session.user.id));
-    } else {
-      setIgVerifyCode('');
-    }
-    setIgCodeCopied(false);
     setIgModalError('');
     setIgModalSuccess('');
+    setShowIgAdvanced(false);
     setIgModalVisible(true);
   }
 
-  async function handleProceedToIgVerify() {
+  async function handleInstagramOAuthLogin() {
+    setIgLoading(true);
+    setIgModalError('');
+    setIgModalSuccess('');
     try {
-      const clean = (igUsername || '').trim().replace(/^@/, '');
-      if (!clean) {
-        setIgModalError('Please enter your Instagram username.');
-        return;
+      let redirectUri = '';
+      if (typeof window !== 'undefined' && window.location) {
+        redirectUri = `${window.location.origin}/dashboard/platforms`;
       }
-      setIgModalError('');
+      
+      if (typeof window !== 'undefined' && window.localStorage) {
+        if (igClientId) localStorage.setItem('streamsync_ig_client_id', igClientId.trim());
+        if (igClientSecret) localStorage.setItem('streamsync_ig_client_secret', igClientSecret.trim());
+      }
 
-      let currentUserId = session?.user?.id;
-      if (!currentUserId) {
-        const { data: { session: activeSession } } = await supabase.auth.getSession();
-        if (activeSession?.user) {
-          setSession(activeSession);
-          currentUserId = activeSession.user.id;
+      const { url } = getInstagramOAuthUrl({
+        redirectUri,
+        clientId: igClientId.trim() || undefined
+      });
+
+      setIgModalSuccess('Redirecting to official Instagram login...');
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.href = url;
+        } else {
+          Linking.openURL(url);
         }
-      }
-
-      const code = generateInstagramVerificationCode(clean, currentUserId || 'creator');
-      setIgVerifyCode(code);
-      setIgStep('verify');
+      }, 400);
     } catch (err) {
-      console.error("Error proceeding to Instagram verification in platforms:", err);
-      setIgModalError(err.message || 'Failed to generate verification code.');
+      setIgModalError(err.message || 'Failed to initiate Instagram OAuth login.');
+      setIgLoading(false);
     }
   }
 
-  async function handleVerifyIgOwnership() {
+  async function handleInstagramQuickSync() {
     const clean = (igUsername || '').trim().replace(/^@/, '');
     if (!clean) {
       setIgModalError('Please enter your Instagram username.');
@@ -537,10 +595,9 @@ export default function ConnectsScreen() {
 
       await verifyInstagramOwnership({
         username: clean,
-        code: igVerifyCode,
         userId: currentUserId
       });
-      setIgModalSuccess(`Successfully verified & connected @${clean}!`);
+      setIgModalSuccess(`Successfully connected @${clean}!`);
       if (currentUserId) {
         await fetchProfile(currentUserId);
       }
@@ -549,18 +606,10 @@ export default function ConnectsScreen() {
         setIgModalSuccess('');
       }, 1200);
     } catch (err) {
-      setIgModalError(err.message || 'Failed to verify Instagram account ownership.');
+      setIgModalError(err.message || 'Failed to sync Instagram account.');
     } finally {
       setIgLoading(false);
     }
-  }
-
-  function handleCopyIgCode(code) {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(code);
-    }
-    setIgCodeCopied(true);
-    setTimeout(() => setIgCodeCopied(false), 2000);
   }
 
   async function handleSyncIgNow() {
@@ -709,6 +758,10 @@ export default function ConnectsScreen() {
         provider = 'x';
         scopes = 'tweet.read users.read offline.access';
         break;
+      case 'ig':
+        setSyncing(null);
+        await handleInstagramOAuthLogin();
+        return;
       case 'in':
         provider = 'linkedin_oidc';
         break;
@@ -1433,21 +1486,65 @@ export default function ConnectsScreen() {
             }}>
               <Feather name="shield" size={16} color="#E1306C" />
               <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#f472b6' : '#be185d', flex: 1 }}>
-                Creator Account Verification • Zero Meta App Setup Required
+                Instagram Login for Creators • Pure Instagram login without Facebook linking
               </Text>
             </View>
 
-            {igStep === 'input' ? (
-              /* STEP 1: Enter your Instagram username */
-              <View style={styles.tabBody}>
-                <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
-                  Connect your personal or creator Instagram account to display your live followers, reel views, engagement rate, and audience analytics.
-                </Text>
+            <View style={styles.tabBody}>
+              <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
+                Connect your personal or creator Instagram account directly to securely fetch your real followers, reel views, reach insights, and engagement rate.
+              </Text>
 
-                <View style={styles.formGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
+              {/* Official Instagram Login for Creators OAuth Button */}
+              <TouchableOpacity 
+                style={[
+                  styles.googleOAuthBtn, 
+                  { backgroundColor: '#E1306C', borderColor: '#E1306C', marginBottom: 6 }
+                ]} 
+                onPress={handleInstagramOAuthLogin}
+                disabled={igLoading}
+              >
+                {igLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <>
+                    <Image 
+                      source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
+                      style={{ width: 20, height: 20, marginRight: 10 }} 
+                    />
+                    <Text style={[styles.googleOAuthBtnText, { color: '#ffffff', fontWeight: '700' }]}>
+                      Continue with Instagram
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {igModalError ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{igModalError}</Text>
+                </View>
+              ) : null}
+
+              {igModalSuccess ? (
+                <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                  <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
+                </View>
+              ) : null}
+
+              {/* Divider */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  OR CONNECT BY USERNAME
+                </Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TextInput
-                    style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                    style={[styles.modalInput, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                     placeholder="e.g. yourname or @yourname"
                     placeholderTextColor={colors.textSecondary}
                     value={igUsername}
@@ -1455,155 +1552,69 @@ export default function ConnectsScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                    Enter your own Instagram username without passwords.
+                  <TouchableOpacity
+                    style={[styles.modalPrimaryBtn, { width: 110, paddingVertical: 10, backgroundColor: '#E1306C' }]}
+                    onPress={handleInstagramQuickSync}
+                    disabled={igLoading}
+                  >
+                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 13 }]}>Sync Stats</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Advanced Accordion: Custom Meta/Instagram App Credentials */}
+              <TouchableOpacity 
+                onPress={() => setShowIgAdvanced(!showIgAdvanced)}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, marginTop: 4 }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="settings" size={13} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                    Custom App Credentials (Optional)
                   </Text>
                 </View>
+                <Feather name={showIgAdvanced ? "chevron-up" : "chevron-down"} size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
 
-                {igModalError ? (
-                  <View style={styles.errorBanner}>
-                    <Text style={styles.errorBannerText}>{igModalError}</Text>
-                  </View>
-                ) : null}
-
-                {igModalSuccess ? (
-                  <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                    <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
-                  </View>
-                ) : null}
-
-                <TouchableOpacity 
-                  style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', marginTop: 4 }]} 
-                  onPress={handleProceedToIgVerify}
-                >
-                  <Text style={styles.modalPrimaryBtnText}>Proceed to Verification →</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* STEP 2: Verify Account Ownership */
-              <View style={styles.tabBody}>
-                {/* Selected Account Bar */}
+              {showIgAdvanced && (
                 <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: colors.badgeBg,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  padding: 12,
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  marginBottom: 12
+                  gap: 10,
+                  marginTop: 6
                 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Feather name="at-sign" size={15} color="#E1306C" />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
-                      @{igUsername.replace(/^@/, '')}
-                    </Text>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => { setIgStep('input'); setIgModalError(''); }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.accent }}>Change username</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Security Verification Code Box */}
-                <View style={{
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  padding: 14,
-                  alignItems: 'center',
-                  marginBottom: 12
-                }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
-                    Your Creator Verification Code
+                  <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }}>
+                    By default, StreamSync connects using your server's configured Instagram App ID. Provide custom credentials below if you'd like to use your own Meta App.
                   </Text>
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                    backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : '#ffffff',
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#E1306C'
-                  }}>
-                    <Text style={{ fontSize: 20, fontWeight: '900', color: '#E1306C', letterSpacing: 2 }}>
-                      {igVerifyCode}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => handleCopyIgCode(igVerifyCode)}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: igCodeCopied ? '#22c55e' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'),
-                        paddingVertical: 4,
-                        paddingHorizontal: 8,
-                        borderRadius: 6,
-                        gap: 4
-                      }}
-                    >
-                      <Feather name={igCodeCopied ? "check" : "copy"} size={12} color={igCodeCopied ? "#fff" : colors.textPrimary} />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: igCodeCopied ? "#fff" : colors.textPrimary }}>
-                        {igCodeCopied ? "Copied!" : "Copy"}
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM APP ID</Text>
+                    <TextInput
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                      placeholder="e.g. 1386754025684618"
+                      placeholderTextColor={colors.textSecondary}
+                      value={igClientId}
+                      onChangeText={setIgClientId}
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM APP SECRET</Text>
+                    <TextInput
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                      placeholder="App Secret"
+                      placeholderTextColor={colors.textSecondary}
+                      value={igClientSecret}
+                      onChangeText={setIgClientSecret}
+                      secureTextEntry
+                      autoCapitalize="none"
+                    />
                   </View>
                 </View>
-
-                {/* Verification Instructions */}
-                <View style={{ gap: 6, marginBottom: 12, paddingHorizontal: 2 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }}>
-                    Quick Verification Options:
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
-                    1. Add <Text style={{ fontWeight: '700', color: '#E1306C' }}>{igVerifyCode}</Text> to your Instagram bio (you can remove it after verification).
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
-                    2. Or tap below to complete a 1-click creator handshake check.
-                  </Text>
-                </View>
-
-                {igModalError ? (
-                  <View style={styles.errorBanner}>
-                    <Text style={styles.errorBannerText}>{igModalError}</Text>
-                  </View>
-                ) : null}
-
-                {igModalSuccess ? (
-                  <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                    <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
-                  </View>
-                ) : null}
-
-                <TouchableOpacity 
-                  style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', marginTop: 4 }]} 
-                  onPress={handleVerifyIgOwnership}
-                  disabled={igLoading}
-                >
-                  {igLoading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.modalPrimaryBtnText}>Verify Ownership & Connect Account</Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 4 }} 
-                  onPress={() => { setIgStep('input'); setIgModalError(''); }}
-                  disabled={igLoading}
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
-                    ← Back to Username Input
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              )}
+            </View>
 
           </View>
         </View>
