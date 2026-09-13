@@ -9,12 +9,15 @@ import {
   getInstagramOAuthUrl,
   exchangeInstagramOAuthCode,
   verifyInstagramOwnership,
+  getPhylloSdkToken,
+  syncPhylloAccountData,
   disconnectPlatform, 
   syncPlatformData, 
   isPlatformMatch, 
   normalizePlatformKey, 
   processSessionOAuthTokens 
 } from '../../lib/api';
+import { launchPhylloConnect } from '../../lib/phyllo';
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
@@ -568,6 +571,81 @@ export default function ConnectsScreen() {
       }, 400);
     } catch (err) {
       setIgModalError(err.message || 'Failed to initiate Instagram OAuth login.');
+      setIgLoading(false);
+    }
+  }
+
+  async function handlePhylloConnect() {
+    setIgLoading(true);
+    setIgModalError('');
+    setIgModalSuccess('');
+    try {
+      let currentUserId = session?.user?.id;
+      let currentUserName = session?.user?.user_metadata?.full_name || 'StreamSync Creator';
+      if (!currentUserId) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          setSession(activeSession);
+          currentUserId = activeSession.user.id;
+          currentUserName = activeSession.user.user_metadata?.full_name || currentUserName;
+        }
+      }
+
+      if (!currentUserId) {
+        throw new Error('Please sign in to connect via Phyllo.');
+      }
+
+      setIgModalSuccess('Launching Phyllo Connect...');
+      const tokenData = await getPhylloSdkToken({
+        userId: currentUserId,
+        userName: currentUserName,
+      });
+
+      if (!tokenData || !tokenData.sdkToken) {
+        throw new Error('Unable to obtain Phyllo SDK token.');
+      }
+
+      await launchPhylloConnect({
+        clientDisplayName: 'StreamSync',
+        userId: tokenData.phylloUserId || currentUserId,
+        token: tokenData.sdkToken,
+        environment: tokenData.environment || 'staging',
+        workPlatformId: tokenData.workPlatformId,
+        onAccountConnected: async (accountId, workPlatformId, userId) => {
+          setIgModalSuccess('Instagram account authenticated via Phyllo! Syncing analytics...');
+          try {
+            await syncPhylloAccountData({
+              accountId,
+              userId: currentUserId,
+              username: igUsername || undefined,
+            });
+            setIgModalSuccess('Instagram connected & synced successfully via Phyllo!');
+            await fetchProfile(currentUserId);
+            setTimeout(() => {
+              setIgModalSuccess('');
+              setIgModalVisible(false);
+            }, 1200);
+          } catch (syncErr) {
+            setIgModalError(syncErr.message || 'Failed to sync Phyllo account metrics.');
+          } finally {
+            setIgLoading(false);
+          }
+        },
+        onAccountDisconnected: (accountId) => {
+          console.log('[Phyllo] Account disconnected:', accountId);
+        },
+        onTokenExpired: () => {
+          setIgModalError('Phyllo session token expired. Please try again.');
+          setIgLoading(false);
+        },
+        onExit: (reason) => {
+          console.log('[Phyllo] User closed connect dialog:', reason);
+          setIgLoading(false);
+        },
+      });
+    } catch (err) {
+      console.warn('[Phyllo] Connect error:', err);
+      setIgModalError(err.message || 'Failed to initialize Phyllo Connect.');
       setIgLoading(false);
     }
   }
@@ -1484,33 +1562,45 @@ export default function ConnectsScreen() {
               gap: 8,
               marginBottom: 14
             }}>
-              <Feather name="zap" size={16} color="#E1306C" />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#f472b6' : '#be185d', flex: 1 }}>
-                Instant Creator Sync • Zero Meta App Setup Required
+              <Feather name="shield" size={16} color="#6C5CE7" />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#a29bfe' : '#6c5ce7', flex: 1 }}>
+                Phyllo Creator Integration • Zero Meta App Review Required
               </Text>
             </View>
 
             <View style={styles.tabBody}>
-              <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
-                Enter your Instagram username to immediately connect your account, fetch live followers, reel views, reach insights, and calculated engagement rate.
-              </Text>
-
-              {/* Primary Username Input Card */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
-                <TextInput
-                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. yourname or @yourname"
-                  placeholderTextColor={colors.textSecondary}
-                  value={igUsername}
-                  onChangeText={setIgUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                  Enter your Instagram username. No passwords or bio codes needed.
-                </Text>
-              </View>
+              {/* Phyllo Connect 1-Click Hero Button */}
+              <TouchableOpacity 
+                style={[
+                  styles.modalPrimaryBtn, 
+                  { 
+                    backgroundColor: '#6C5CE7', 
+                    paddingVertical: 14, 
+                    marginBottom: 10,
+                    shadowColor: '#6C5CE7',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }
+                ]} 
+                onPress={handlePhylloConnect}
+                disabled={igLoading}
+              >
+                {igLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                    <Image 
+                      source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
+                      style={{ width: 20, height: 20 }} 
+                    />
+                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 15, fontWeight: '700' }]}>
+                      Connect via Phyllo
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
               {igModalError ? (
                 <View style={styles.errorBanner}>
@@ -1524,26 +1614,42 @@ export default function ConnectsScreen() {
                 </View>
               ) : null}
 
-              {/* Primary Connect Button */}
-              <TouchableOpacity 
-                style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', paddingVertical: 13, marginBottom: 8 }]} 
-                onPress={handleInstagramQuickSync}
-                disabled={igLoading}
-              >
-                {igLoading ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    <Image 
-                      source={{ uri: 'https://img.icons8.com/fluent/512/instagram-new.png' }} 
-                      style={{ width: 18, height: 18 }} 
-                    />
-                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 14, fontWeight: '700' }]}>
-                      Connect Instagram Account
+              {/* Divider */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ marginHorizontal: 10, fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                  OR CONNECT BY USERNAME
+                </Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              {/* Quick Username Input Card */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                    placeholder="e.g. yourname or @yourname"
+                    placeholderTextColor={colors.textSecondary}
+                    value={igUsername}
+                    onChangeText={setIgUsername}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity 
+                    style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', width: 110, paddingVertical: 10 }]} 
+                    onPress={handleInstagramQuickSync}
+                    disabled={igLoading}
+                  >
+                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 13, fontWeight: '700' }]}>
+                      Sync Stats
                     </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                  Instant public handle calibration without credentials.
+                </Text>
+              </View>
 
               {/* Advanced Accordion: Meta Developer OAuth (Optional) */}
               <TouchableOpacity 
