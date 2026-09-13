@@ -329,8 +329,10 @@ export default function DashboardIndex() {
           }
 
           return (
-            <View 
+            <TouchableOpacity 
               key={name} 
+              activeOpacity={0.88}
+              onPress={() => openConnectModal(name)}
               dataSet={{ gridBox: 'true' }}
               style={[
                 styles.platformCard, 
@@ -340,6 +342,7 @@ export default function DashboardIndex() {
                   borderTopWidth: isDark ? 0 : 3, 
                   borderTopColor: isDark ? 'transparent' : config.color,
                   borderWidth: isDark ? 0 : 1,
+                  cursor: Platform.OS === 'web' ? 'pointer' : 'default',
                   ...(Platform.OS === 'web' ? { boxShadow: isDark ? '0 8px 30px rgba(0, 0, 0, 0.55)' : `0px 8px 24px ${config.color}15` } : {})
                 }
               ]}
@@ -354,13 +357,18 @@ export default function DashboardIndex() {
                   <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={2}>{statusText}</Text>
                 </View>
                 
-                {isConnected && (
-                  <TouchableOpacity 
-                    onPress={() => openConnectModal(name)} 
+                {isConnected ? (
+                  <View 
                     style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: colors.badgeBg, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
                   >
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>Manage</Text>
-                  </TouchableOpacity>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>Manage ↗</Text>
+                  </View>
+                ) : (
+                  <View 
+                    style={{ marginRight: 12, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12 }}
+                  >
+                    <Text style={{ fontSize: 12, color: colors.accent, fontWeight: '600' }}>Connect +</Text>
+                  </View>
                 )}
                 <View style={[styles.statusDot, dotStyle]} />
               </View>
@@ -389,11 +397,11 @@ export default function DashboardIndex() {
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity style={[styles.connectPlatformBtn, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]} onPress={() => openConnectModal(name)}>
+                <View style={[styles.connectPlatformBtn, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
                   <Text style={[styles.connectPlatformText, { color: colors.textSecondary }]}>Connect {name} →</Text>
-                </TouchableOpacity>
+                </View>
               )}
-            </View>
+            </TouchableOpacity>
           );
         })}
       </View>
@@ -574,6 +582,7 @@ export default function DashboardIndex() {
       onClose={() => setModalVisible(false)}
       initialPlatform={selectedPlatform}
       onSuccess={reloadDashboardData}
+      platformData={data}
     />
 
   </View>
