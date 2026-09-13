@@ -1,15 +1,27 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View, Text, Platform, Animated } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ThemeToggle({ style, showLabel = false, size = 'default' }) {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   const isSmall = size === 'small';
+  const animValue = useRef(new Animated.Value(isDark ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(animValue, {
+      toValue: isDark ? 1 : 0,
+      tension: 65,
+      friction: 8.5,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [isDark]);
+
+  const slotSize = isSmall ? 24 : 28;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={toggleTheme}
       style={[
         styles.container,
@@ -21,27 +33,88 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
       accessibilityLabel={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
       title={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
     >
+      {/* Animated Sliding Active Indicator Pill */}
+      <Animated.View
+        style={[
+          styles.slidingPill,
+          isSmall ? styles.slidingPillSmall : styles.slidingPillDefault,
+          isDark ? styles.pillDark : styles.pillLight,
+          {
+            transform: [
+              {
+                translateX: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, slotSize],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+
       {/* Sun side (Day) */}
-      <View style={[
-        styles.iconSlot,
-        isSmall && styles.iconSlotSmall,
-        !isDark && styles.activeSlotLight
-      ]}>
+      <Animated.View
+        style={[
+          styles.iconSlot,
+          isSmall && styles.iconSlotSmall,
+          {
+            opacity: animValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0.4],
+            }),
+            transform: [
+              {
+                scale: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1.08, 0.88],
+                }),
+              },
+              {
+                rotate: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '-24deg'],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         <Text style={[styles.iconText, isSmall && styles.iconTextSmall]}>
           ☀️
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Moon side (Night) */}
-      <View style={[
-        styles.iconSlot,
-        isSmall && styles.iconSlotSmall,
-        isDark && styles.activeSlotDark
-      ]}>
+      <Animated.View
+        style={[
+          styles.iconSlot,
+          isSmall && styles.iconSlotSmall,
+          {
+            opacity: animValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.4, 1],
+            }),
+            transform: [
+              {
+                scale: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.88, 1.08],
+                }),
+              },
+              {
+                rotate: animValue.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['24deg', '0deg'],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         <Text style={[styles.iconText, isSmall && styles.iconTextSmall]}>
           🌙
         </Text>
-      </View>
+      </Animated.View>
 
       {showLabel && (
         <Text style={[
@@ -57,6 +130,7 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
 
 const styles = StyleSheet.create({
   container: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     padding: 3,
@@ -65,7 +139,7 @@ const styles = StyleSheet.create({
     cursor: Platform.OS === 'web' ? 'pointer' : undefined,
     userSelect: 'none',
     ...(Platform.OS === 'web' ? {
-      transition: 'background-color 0.25s ease, border-color 0.25s ease',
+      transition: 'background-color 0.35s ease, border-color 0.35s ease',
     } : {}),
   },
   containerLight: {
@@ -79,46 +153,62 @@ const styles = StyleSheet.create({
   containerSmall: {
     padding: 2,
   },
+  slidingPill: {
+    position: 'absolute',
+    borderRadius: 999,
+    zIndex: 1,
+  },
+  slidingPillDefault: {
+    top: 3,
+    left: 3,
+    width: 28,
+    height: 28,
+  },
+  slidingPillSmall: {
+    top: 2,
+    left: 2,
+    width: 24,
+    height: 24,
+  },
+  pillLight: {
+    backgroundColor: '#ffffff',
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
+    } : {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      elevation: 2,
+    }),
+  },
+  pillDark: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+    ...(Platform.OS === 'web' ? {
+      boxShadow: '0 2px 8px rgba(168, 85, 247, 0.3)',
+    } : {
+      shadowColor: '#a855f7',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 3,
+    }),
+  },
   iconSlot: {
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    ...(Platform.OS === 'web' ? {
-      transition: 'background-color 0.2s ease, transform 0.2s ease',
-    } : {}),
+    zIndex: 2,
   },
   iconSlotSmall: {
     width: 24,
     height: 24,
     borderRadius: 12,
-  },
-  activeSlotLight: {
-    backgroundColor: '#ffffff',
-    ...(Platform.OS === 'web' ? {
-      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-    } : {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 2,
-    }),
-  },
-  activeSlotDark: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.4)',
-    ...(Platform.OS === 'web' ? {
-      boxShadow: '0 2px 8px rgba(168, 85, 247, 0.25)',
-    } : {
-      shadowColor: '#a855f7',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 3,
-    }),
+    zIndex: 2,
   },
   iconText: {
     fontSize: 14,
@@ -130,6 +220,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginHorizontal: 8,
+    zIndex: 2,
   },
   labelTextLight: {
     color: '#475569',
