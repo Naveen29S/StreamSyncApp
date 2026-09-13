@@ -153,12 +153,12 @@ export default function DashboardLayout() {
 
   // Listen for real-time manual or automated frequent refreshes
   useEffect(() => {
-    return registerRefreshListener(async () => {
+    return registerRefreshListener(async (opts = {}) => {
       const { data: { session: s } } = await supabase.auth.getSession();
       if (s) {
         const platforms = await fetchActivePlatforms(s);
         setConnectedPlatforms(platforms);
-        if (platforms && platforms.length > 0) {
+        if (opts?.manual && platforms && platforms.length > 0) {
           await syncPlatformData(platforms);
         }
       }

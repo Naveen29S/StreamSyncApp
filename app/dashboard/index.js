@@ -18,6 +18,8 @@ const PLATFORMS = {
 
 export default function DashboardIndex() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const { registerRefreshListener, triggerRefresh, isRefreshing } = useRefresh();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
@@ -179,9 +181,16 @@ export default function DashboardIndex() {
     };
   }, []);
 
+  // Subscribe to real-time manual or frequent auto refreshes
+  useEffect(() => {
+    return registerRefreshListener(async () => {
+      await reloadDashboardData();
+    });
+  }, [registerRefreshListener]);
+
   if (loading) {
     return (
-      <View style={styles.loadingWrap}>
+      <View style={[styles.loadingWrap, { backgroundColor: colors.bodyBg }]}>
         <View style={styles.loadingPulse}>
           <Image
             source={require('../../assets/logo-mark.png')}
@@ -189,21 +198,11 @@ export default function DashboardIndex() {
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.loadingText}>Syncing your platforms...</Text>
-        <Text style={styles.loadingSub}>Pulling data from connected accounts</Text>
+        <Text style={[styles.loadingText, { color: colors.textPrimary }]}>Syncing your platforms...</Text>
+        <Text style={[styles.loadingSub, { color: colors.textSecondary }]}>Pulling data from connected accounts</Text>
       </View>
     );
   }
-
-  const { colors, isDark } = useTheme();
-  const { registerRefreshListener, triggerRefresh, isRefreshing } = useRefresh();
-
-  // Subscribe to real-time manual or frequent auto refreshes
-  useEffect(() => {
-    return registerRefreshListener(async () => {
-      await reloadDashboardData();
-    });
-  }, [registerRefreshListener]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bodyBg }}>

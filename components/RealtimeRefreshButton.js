@@ -27,7 +27,7 @@ export default function RealtimeRefreshButton({ style, compact = false }) {
           toValue: 1,
           duration: 750,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         })
       );
       anim.start();
@@ -36,7 +36,7 @@ export default function RealtimeRefreshButton({ style, compact = false }) {
         toValue: 1,
         duration: 250,
         easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         spinValue.setValue(0);
       });
@@ -61,10 +61,7 @@ export default function RealtimeRefreshButton({ style, compact = false }) {
 
   return (
     <View style={[styles.wrapper, style]}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => triggerRefresh(true)}
-        disabled={isRefreshing}
+      <View
         style={[
           styles.pill,
           {
@@ -73,53 +70,57 @@ export default function RealtimeRefreshButton({ style, compact = false }) {
           },
           isRefreshing && (isDark ? styles.pillRefreshingDark : styles.pillRefreshingLight),
         ]}
-        accessibilityRole="button"
-        accessibilityLabel="Refresh website in real time"
-        title="Click to refresh real-time data"
       >
-        <View style={styles.dotContainer}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: autoRefreshEnabled ? '#10b981' : (isDark ? '#64748b' : '#94a3b8') },
-            ]}
-          />
-          {autoRefreshEnabled && (
-            <View style={[styles.statusPulseRing, { borderColor: '#10b981' }]} />
-          )}
-        </View>
-
-        <Animated.View style={{ transform: [{ rotate: spin }] }}>
-          <Text style={[styles.refreshIcon, { color: isRefreshing ? '#a855f7' : colors.textPrimary }]}>
-            ↻
-          </Text>
-        </Animated.View>
-
-        {!compact && (
-          <View style={styles.textCol}>
-            <View style={styles.topRow}>
-              <Text style={[styles.mainLabel, { color: isRefreshing ? '#a855f7' : colors.textPrimary }]}>
-                {isRefreshing ? 'Syncing...' : 'Live'}
-              </Text>
-              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-                • {getRelativeTimeText()}
-              </Text>
-            </View>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => triggerRefresh(true)}
+          disabled={isRefreshing}
+          style={styles.pillAction}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh website in real time"
+          title="Click to refresh real-time data"
+        >
+          <View style={styles.dotContainer}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: autoRefreshEnabled ? '#10b981' : (isDark ? '#64748b' : '#94a3b8') },
+              ]}
+            />
+            {autoRefreshEnabled && (
+              <View style={[styles.statusPulseRing, { borderColor: '#10b981' }]} />
+            )}
           </View>
-        )}
+
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <Text style={[styles.refreshIcon, { color: isRefreshing ? '#a855f7' : colors.textPrimary }]}>
+              ↻
+            </Text>
+          </Animated.View>
+
+          {!compact && (
+            <View style={styles.textCol}>
+              <View style={styles.topRow}>
+                <Text style={[styles.mainLabel, { color: isRefreshing ? '#a855f7' : colors.textPrimary }]}>
+                  {isRefreshing ? 'Syncing...' : 'Live'}
+                </Text>
+                <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+                  • {getRelativeTimeText()}
+                </Text>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={(e) => {
-            e.stopPropagation?.();
-            setMenuOpen(!menuOpen);
-          }}
+          onPress={() => setMenuOpen(!menuOpen)}
           hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
           style={[styles.menuChevronBtn, { borderLeftColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}
           title="Auto-refresh settings"
         >
           <Text style={[styles.chevronText, { color: colors.textSecondary }]}>▾</Text>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
 
       {menuOpen && (
         <View
@@ -215,6 +216,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     gap: 7,
+  },
+  pillAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     ...(Platform.OS === 'web' ? {
       cursor: 'pointer',
       userSelect: 'none',
@@ -275,6 +281,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? {
+      cursor: 'pointer',
+      userSelect: 'none',
+    } : {}),
   },
   chevronText: {
     fontSize: 11,

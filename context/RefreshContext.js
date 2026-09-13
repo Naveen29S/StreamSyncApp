@@ -30,6 +30,7 @@ export function RefreshProvider({ children }) {
   const [autoRefreshEnabled, setAutoRefreshEnabledState] = useState(true);
   const [refreshInterval, setRefreshIntervalState] = useState(30000); // 30 seconds default
   
+  const isRefreshingRef = useRef(false);
   const listenersRef = useRef(new Set());
   const timerRef = useRef(null);
   const secondsTimerRef = useRef(null);
@@ -85,9 +86,10 @@ export function RefreshProvider({ children }) {
     };
   }, []);
 
-  // Main refresh executor
+  // Main refresh executor with stable reference and safety checks
   const triggerRefresh = useCallback(async (manual = true) => {
-    if (isRefreshing) return;
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     setIsRefreshing(true);
 
     const startTime = Date.now();
@@ -95,16 +97,18 @@ export function RefreshProvider({ children }) {
     try {
       // 1. Dispatch custom DOM event for web
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('streamsync:refresh', { 
-          detail: { manual, timestamp: startTime } 
-        }));
+        try {
+          window.dispatchEvent(new CustomEvent('streamsync:refresh', { 
+            detail: { manual, timestamp: startTime } 
+          }));
+        } catch (_) {}
       }
 
       // 2. Execute all subscribed screen listeners concurrently
       const promises = [];
       listenersRef.current.forEach((listener) => {
         try {
-          const res = listener();
+          const res = listener({ manual, timestamp: startTime });
           if (res && typeof res.then === 'function') {
             promises.push(res);
           }
@@ -117,10 +121,10 @@ export function RefreshProvider({ children }) {
         await Promise.allSettled(promises);
       }
 
-      // Ensure at least 450ms animation feedback for manual clicks
+      // Ensure at least 350ms animation feedback for manual clicks
       const elapsed = Date.now() - startTime;
-      if (manual && elapsed < 450) {
-        await new Promise(r => setTimeout(r, 450 - elapsed));
+      if (manual && elapsed < 350) {
+        await new Promise(r => setTimeout(r, 350 - elapsed));
       }
 
       const now = new Date();
@@ -130,9 +134,10 @@ export function RefreshProvider({ children }) {
     } catch (error) {
       console.warn('StreamSync real-time refresh notice:', error);
     } finally {
+      isRefreshingRef.current = false;
       setIsRefreshing(false);
     }
-  }, [isRefreshing]);
+  }, []);
 
   // Relative time counter ("Updated X seconds ago")
   useEffect(() => {
@@ -156,7 +161,7 @@ export function RefreshProvider({ children }) {
     if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
-      // Don't refresh if web tab is hidden
+      // Don't refresh if web tab is hidden or backgrounded
       if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) {
         return;
       }
@@ -168,24 +173,22 @@ export function RefreshProvider({ children }) {
     };
   }, [autoRefreshEnabled, refreshInterval, triggerRefresh]);
 
-  // Tab visibility change / focus handler: refresh if returning to tab after >15 seconds
+  // Tab visibility change handler: refresh if returning to tab after >30 seconds of inactivity
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
 
-    const handleFocusOrVisibility = () => {
+    const handleVisibility = () => {
       if (document.hidden) return;
       const elapsed = Date.now() - lastRefreshTimeRef.current;
-      if (elapsed > 15000) {
+      if (elapsed > 30000) {
         triggerRefresh(false);
       }
     };
 
-    window.addEventListener('focus', handleFocusOrVisibility);
-    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      window.removeEventListener('focus', handleFocusOrVisibility);
-      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [triggerRefresh]);
 
