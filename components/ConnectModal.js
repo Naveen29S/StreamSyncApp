@@ -67,19 +67,19 @@ export const PLATFORMS_CONFIG = {
   },
   'Instagram': { 
     id: 'ig', 
-    name: 'Instagram',
+    name: 'Instagram', 
     color: '#E1306C', 
     bg: 'rgba(225,48,108,0.08)', 
-    logo: 'https://img.icons8.com/fluent/512/instagram-new.png',
-    portalUrl: 'https://developers.facebook.com/apps',
-    portalLabel: 'developers.facebook.com ↗',
-    defaultHandle: 'creators',
-    type: 'Photos, Reels & Stories',
-    metricLabels: ['Followers', 'Reel Views', 'Engagement', 'Reach Growth'],
-    oauthProvider: 'facebook',
-    oauthScopes: 'public_profile',
-    oauthText: 'Continue with Instagram Graph',
-    profileUrlPrefix: 'https://instagram.com/'
+    logo: 'https://img.icons8.com/fluent/512/instagram-new.png', 
+    portalUrl: 'https://instagram.com', 
+    portalLabel: 'instagram.com ↗', 
+    defaultHandle: 'creators', 
+    type: 'Photos, Reels & Stories', 
+    metricLabels: ['Followers', 'Reel Views', 'Engagement', 'Reach Growth'], 
+    oauthProvider: null, 
+    oauthScopes: null, 
+    oauthText: 'Sync via Instagram Handle', 
+    profileUrlPrefix: 'https://instagram.com/' 
   },
   'Facebook': { 
     id: 'fb', 
@@ -331,7 +331,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     const chanToUse = (customChannel !== undefined ? customChannel : ytChannelId).trim();
 
     if (!keyToUse) {
-      setYtModalError('Please enter a YouTube Data API Key (or click "Quick Demo Channel" below).');
+      setYtModalError('Please enter a YouTube Data API Key or continue with Google.');
       return;
     }
     if (!chanToUse) {
@@ -358,12 +358,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  async function handleQuickDemoConnect() {
-    setYtApiKey('DEMO');
-    setYtChannelId('@GoogleDevelopers');
-    await handleApiKeyConnect('DEMO', '@GoogleDevelopers');
-  }
-
   // Twitch
   async function handleTwitchConnect(customId, customSecret, customUser) {
     const idToUse = (customId !== undefined ? customId : twitchClientId).trim();
@@ -375,7 +369,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       return;
     }
     if (!idToUse || !secToUse) {
-      setTwitchModalError('Please enter Twitch Client ID & Secret (or click Quick Demo).');
+      setTwitchModalError('Please enter your Twitch Client ID & Secret.');
       return;
     }
 
@@ -398,13 +392,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  async function handleQuickDemoTwitchConnect() {
-    setTwitchClientId('DEMO');
-    setTwitchClientSecret('DEMO');
-    setTwitchUsername('shroud');
-    await handleTwitchConnect('DEMO', 'DEMO', 'shroud');
-  }
-
   // X (Twitter)
   async function handleXConnect(customToken, customUser) {
     const tokenToUse = (customToken !== undefined ? customToken : xBearerToken).trim();
@@ -414,7 +401,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setXModalError('');
     setXModalSuccess('');
     try {
-      await connectXViaApiKey(tokenToUse || 'DEMO', userToUse || 'TwitterDev');
+      await connectXViaApiKey(tokenToUse, userToUse || 'TwitterDev');
       setXModalSuccess(`Connected @${(userToUse || 'TwitterDev').replace(/^@/, '')} successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
@@ -429,23 +416,21 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  async function handleQuickDemoXConnect() {
-    setXBearerToken('DEMO');
-    setXUsername('TwitterDev');
-    await handleXConnect('DEMO', 'TwitterDev');
-  }
-
   // Instagram
   async function handleInstagramConnect(customToken, customUser) {
-    const tokenToUse = (customToken !== undefined ? customToken : igAccessToken).trim();
     const userToUse = (customUser !== undefined ? customUser : igUsername).trim();
+
+    if (!userToUse) {
+      setIgModalError('Please enter an Instagram username or handle.');
+      return;
+    }
 
     setIgLoading(true);
     setIgModalError('');
     setIgModalSuccess('');
     try {
-      const data = await connectInstagramViaApiKey(userToUse || 'creators', tokenToUse || 'DEMO');
-      setIgModalSuccess(`Connected @${(userToUse || 'creators').replace(/^@/, '')} successfully!`);
+      const data = await connectInstagramViaApiKey(userToUse);
+      setIgModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
@@ -459,16 +444,9 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  async function handleQuickDemoInstagram() {
-    setIgUsername('creators');
-    setIgAccessToken('DEMO');
-    await handleInstagramConnect('DEMO', 'creators');
-  }
-
   async function handleQuickInfluencerConnect(username) {
     setIgUsername(username);
-    setIgAccessToken('DEMO');
-    await handleInstagramConnect('DEMO', username);
+    await handleInstagramConnect('', username);
   }
 
   // Facebook
@@ -480,7 +458,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setFbModalError('');
     setFbModalSuccess('');
     try {
-      const data = await connectFacebookViaApiKey(pageToUse || 'Meta', tokenToUse || 'DEMO');
+      const data = await connectFacebookViaApiKey(pageToUse || 'Meta', tokenToUse);
       setFbModalSuccess(`Connected "${pageToUse || 'Meta'}" page successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
@@ -495,12 +473,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     }
   }
 
-  async function handleQuickDemoFacebook() {
-    setFbPageName('Meta');
-    setFbAccessToken('DEMO');
-    await handleFacebookConnect('DEMO', 'Meta');
-  }
-
   // LinkedIn
   async function handleLinkedInConnect(customToken, customProfile) {
     const tokenToUse = (customToken !== undefined ? customToken : inAccessToken).trim();
@@ -510,7 +482,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setInModalError('');
     setInModalSuccess('');
     try {
-      const data = await connectLinkedInViaApiKey(profileToUse || 'google', tokenToUse || 'DEMO');
+      const data = await connectLinkedInViaApiKey(profileToUse || 'google', tokenToUse);
       setInModalSuccess(`Connected "${profileToUse || 'google'}" successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
@@ -523,12 +495,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     } finally {
       setInLoading(false);
     }
-  }
-
-  async function handleQuickDemoLinkedIn() {
-    setInProfileName('google');
-    setInAccessToken('DEMO');
-    await handleLinkedInConnect('DEMO', 'google');
   }
 
   // Universal Sync Now
@@ -999,14 +965,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                             <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect & Fetch Channel Data</Text>
                           )}
                         </TouchableOpacity>
-
-                        <TouchableOpacity 
-                          style={styles.quickSampleBtn}
-                          onPress={handleQuickDemoConnect}
-                          disabled={ytLoading}
-                        >
-                          <Text style={[styles.quickSampleText, { color: colors.accent }]}>⚡ Quick Connect Sample Channel (@GoogleDevelopers)</Text>
-                        </TouchableOpacity>
                       </View>
                     ) : (
                       <View style={{ gap: 14 }}>
@@ -1019,14 +977,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                           <Text style={[styles.googleOAuthBtnText, { color: colors.textPrimary }]}>
                             {actionLoading ? 'Connecting to Google...' : 'Continue with Google'}
                           </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                          style={[styles.quickSampleBtn, { marginTop: 6 }]}
-                          onPress={handleQuickDemoConnect}
-                          disabled={ytLoading}
-                        >
-                          <Text style={[styles.quickSampleText, { color: colors.accent }]}>⚡ Quick Demo: Connect Sample Channel (@GoogleDevelopers)</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1097,14 +1047,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                         <Text style={styles.modalPrimaryBtnText}>Connect Twitch Channel</Text>
                       )}
                     </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { borderColor: '#9146FF', backgroundColor: colors.cardBg }]} 
-                      onPress={handleQuickDemoTwitchConnect}
-                      disabled={twitchLoading}
-                    >
-                      <Text style={[styles.modalSecondaryBtnText, { color: '#9146FF' }]}>⚡ Quick Demo: Test with Shroud Channel (10.8M)</Text>
-                    </TouchableOpacity>
                   </View>
                 ) : selectedPlatform === 'X (Twitter)' ? (
                   <View style={{ gap: 14 }}>
@@ -1151,10 +1093,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
 
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X API BEARER TOKEN (OPTIONAL FOR QUICK DEMO)</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X API BEARER TOKEN (OPTIONAL)</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. AAAAAAAAAAAAAAAAAAAAA... (or DEMO)"
+                        placeholder="e.g. Enter your X Bearer Token"
                         placeholderTextColor={colors.textSecondary}
                         value={xBearerToken}
                         onChangeText={setXBearerToken}
@@ -1188,42 +1130,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                         <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect X Account</Text>
                       )}
                     </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { borderColor: colors.border, backgroundColor: colors.cardBg }]} 
-                      onPress={handleQuickDemoXConnect}
-                      disabled={xLoading}
-                    >
-                      <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>⚡ Quick Demo: Connect @TwitterDev Channel</Text>
-                    </TouchableOpacity>
                   </View>
                 ) : selectedPlatform === 'Instagram' ? (
                   <View style={{ gap: 14 }}>
-                    {/* 1-Click Instagram Graph OAuth */}
-                    <TouchableOpacity 
-                      style={[
-                        styles.googleOAuthBtn, 
-                        { backgroundColor: '#E1306C', borderColor: '#E1306C' }
-                      ]} 
-                      onPress={() => handleOAuthConnect('ig')}
-                      disabled={actionLoading}
-                    >
-                      <Image 
-                        source={{ uri: PLATFORMS_CONFIG['Instagram'].logo }} 
-                        style={{ width: 18, height: 18, marginRight: 10 }} 
-                      />
-                      <Text style={[styles.googleOAuthBtnText, { color: '#ffffff' }]}>
-                        {actionLoading ? "Connecting to Instagram..." : "Continue with Instagram Graph"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                      <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                        OR SYNC CREATOR & INFLUENCER HANDLE
-                      </Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                    </View>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 19 }}>
+                      Connect any Instagram creator or influencer profile to sync followers, reel views, engagement rates, and comments directly via StreamSync API.
+                    </Text>
 
                     {/* Influencer Quick Presets */}
                     <View style={{ marginBottom: 4 }}>
@@ -1253,7 +1165,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                               disabled={igLoading}
                             >
                               <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#E1306C' : colors.textPrimary }}>
-                                ⚡ {inf.label}
+                                {inf.label}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -1261,8 +1173,16 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       </View>
                     </View>
 
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                      <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                        OR ENTER INSTAGRAM USERNAME / HANDLE
+                      </Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                    </View>
+
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CUSTOM INSTAGRAM USERNAME / HANDLE *</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM USERNAME / HANDLE *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                         placeholder="e.g. creators, mrbeast, or your handle"
@@ -1273,26 +1193,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                         autoCorrect={false}
                       />
                     </View>
-
-                    <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM GRAPH ACCESS TOKEN (OPTIONAL / DEMO)</Text>
-                      <TextInput
-                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="Leave blank or DEMO for instant influencer sync"
-                        placeholderTextColor={colors.textSecondary}
-                        value={igAccessToken}
-                        onChangeText={setIgAccessToken}
-                        secureTextEntry={true}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
-
-                    <TouchableOpacity onPress={() => Linking.openURL('https://developers.facebook.com/apps')}>
-                      <Text style={{ fontSize: 12, color: '#E1306C', fontWeight: '600' }}>
-                        Need Instagram Graph API credentials? Visit developers.facebook.com ↗
-                      </Text>
-                    </TouchableOpacity>
 
                     {igModalError ? (
                       <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{igModalError}</Text></View>
@@ -1311,14 +1211,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       ) : (
                         <Text style={styles.modalPrimaryBtnText}>Connect & Sync Influencer Data</Text>
                       )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { borderColor: '#E1306C', backgroundColor: colors.cardBg }]} 
-                      onPress={handleQuickDemoInstagram}
-                      disabled={igLoading}
-                    >
-                      <Text style={[styles.modalSecondaryBtnText, { color: '#E1306C' }]}>⚡ Quick Demo: Connect @creators (14.8M Followers)</Text>
                     </TouchableOpacity>
                   </View>
                 ) : selectedPlatform === 'Facebook' ? (
@@ -1363,10 +1255,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
 
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PAGE ACCESS TOKEN (OR DEMO)</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PAGE ACCESS TOKEN (OPTIONAL)</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. EAAB... (or leave DEMO)"
+                        placeholder="e.g. Enter your Facebook Page Token"
                         placeholderTextColor={colors.textSecondary}
                         value={fbAccessToken}
                         onChangeText={setFbAccessToken}
@@ -1399,14 +1291,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       ) : (
                         <Text style={styles.modalPrimaryBtnText}>Connect Facebook Page</Text>
                       )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { borderColor: '#1877F2', backgroundColor: colors.cardBg }]} 
-                      onPress={handleQuickDemoFacebook}
-                      disabled={fbLoading}
-                    >
-                      <Text style={[styles.modalSecondaryBtnText, { color: '#1877F2' }]}>⚡ Quick Demo: Connect Meta Page (8.2M Followers)</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -1452,10 +1336,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
 
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (OR DEMO)</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (OPTIONAL)</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. AQX... (or leave DEMO)"
+                        placeholder="e.g. Enter your LinkedIn Access Token"
                         placeholderTextColor={colors.textSecondary}
                         value={inAccessToken}
                         onChangeText={setInAccessToken}
@@ -1488,14 +1372,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       ) : (
                         <Text style={styles.modalPrimaryBtnText}>Connect LinkedIn Profile</Text>
                       )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { borderColor: '#0A66C2', backgroundColor: colors.cardBg }]} 
-                      onPress={handleQuickDemoLinkedIn}
-                      disabled={inLoading}
-                    >
-                      <Text style={[styles.modalSecondaryBtnText, { color: '#0A66C2' }]}>⚡ Quick Demo: Connect Google Profile (12.8M Connections)</Text>
                     </TouchableOpacity>
                   </View>
                 )}

@@ -337,7 +337,7 @@ export default function ConnectsScreen() {
       return;
     }
     if (!idToUse || !secToUse) {
-      setTwitchModalError('Please enter Twitch Client ID & Secret (or click "Quick Demo Channel" below to test).');
+      setTwitchModalError('Please enter Twitch Client ID & Secret.');
       return;
     }
 
@@ -360,13 +360,6 @@ export default function ConnectsScreen() {
     } finally {
       setTwitchLoading(false);
     }
-  }
-
-  async function handleQuickDemoTwitchConnect(streamer = 'shroud') {
-    setTwitchClientId('DEMO');
-    setTwitchClientSecret('DEMO');
-    setTwitchUsername(streamer);
-    await handleTwitchConnect('DEMO', 'DEMO', streamer);
   }
 
   async function handleSyncTwitchNow() {
@@ -432,12 +425,6 @@ export default function ConnectsScreen() {
     } finally {
       setXLoading(false);
     }
-  }
-
-  async function handleQuickDemoXConnect(handle = 'TwitterDev') {
-    setXBearerToken('DEMO');
-    setXUsername(handle);
-    await handleXConnect('DEMO', handle);
   }
 
   async function handleSyncXNow() {
@@ -550,7 +537,7 @@ export default function ConnectsScreen() {
     const chanToUse = (customChannel !== undefined ? customChannel : ytChannelId).trim();
 
     if (!keyToUse) {
-      setYtModalError('Please enter a YouTube Data API Key (or click "Quick Demo Channel" below to test).');
+      setYtModalError('Please enter a YouTube Data API Key.');
       return;
     }
     if (!chanToUse) {
@@ -578,12 +565,6 @@ export default function ConnectsScreen() {
     } finally {
       setYtLoading(false);
     }
-  }
-
-  async function handleQuickDemoConnect() {
-    setYtApiKey('DEMO');
-    setYtChannelId('@GoogleDevelopers');
-    await handleApiKeyConnect('DEMO', '@GoogleDevelopers');
   }
 
   async function handleSyncYtNow() {
@@ -659,7 +640,6 @@ export default function ConnectsScreen() {
         scopes = 'https://www.googleapis.com/auth/youtube.readonly';
         break;
       case 'fb':
-      case 'ig':
         provider = 'facebook';
         scopes = 'public_profile';
         break;
@@ -1003,14 +983,6 @@ export default function ConnectsScreen() {
                     <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect & Fetch Channel Data</Text>
                   )}
                 </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={[styles.quickSampleBtn, { marginTop: 4 }]}
-                  onPress={handleQuickDemoConnect}
-                  disabled={ytLoading}
-                >
-                  <Text style={[styles.quickSampleText, { color: colors.accent }]}>⚡ Quick Connect Sample Channel (@GoogleDevelopers)</Text>
-                </TouchableOpacity>
               </View>
             ) : (
               /* Tab: Google OAuth */
@@ -1168,14 +1140,6 @@ export default function ConnectsScreen() {
                   <Text style={styles.modalPrimaryBtnText}>Connect Twitch Channel</Text>
                 )}
               </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#9146FF', backgroundColor: colors.cardBg }]} 
-                onPress={() => handleQuickDemoTwitchConnect('shroud')}
-                disabled={twitchLoading}
-              >
-                <Text style={[styles.modalSecondaryBtnText, { color: '#9146FF' }]}>⚡ Quick Demo: Test with Shroud Channel (No Keys Needed)</Text>
-              </TouchableOpacity>
             </View>
 
           </View>
@@ -1268,7 +1232,7 @@ export default function ConnectsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
               <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
-                OR QUICK DEMO / MANUAL API KEY
+                OR CONNECT VIA API KEY
               </Text>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             </View>
@@ -1288,10 +1252,10 @@ export default function ConnectsScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X API BEARER TOKEN (OPTIONAL FOR QUICK DEMO)</Text>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X API BEARER TOKEN (OPTIONAL)</Text>
                 <TextInput
                   style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. AAAAAAAAAAAAAAAAAAAAA... (or DEMO)"
+                  placeholder="e.g. Enter your X Bearer Token"
                   placeholderTextColor={colors.textSecondary}
                   value={xBearerToken}
                   onChangeText={setXBearerToken}
@@ -1306,7 +1270,7 @@ export default function ConnectsScreen() {
                 style={{ marginBottom: 12 }}
               >
                 <Text style={{ fontSize: 12, color: colors.accent, fontWeight: '600' }}>
-                  Need an X API token? Get one at developer.x.com ↗ (or click Quick Demo below)
+                  Need an X API token? Get one at developer.x.com ↗
                 </Text>
               </TouchableOpacity>
 
@@ -1332,14 +1296,6 @@ export default function ConnectsScreen() {
                 ) : (
                   <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect X Account</Text>
                 )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: colors.border, backgroundColor: colors.cardBg }]} 
-                onPress={() => handleQuickDemoXConnect('TwitterDev')}
-                disabled={xLoading}
-              >
-                <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>⚡ Quick Demo: Test with @TwitterDev (No Token Needed)</Text>
               </TouchableOpacity>
             </View>
 
@@ -1457,20 +1413,6 @@ export default function ConnectsScreen() {
                   placeholderTextColor={colors.textSecondary}
                   value={igUsername}
                   onChangeText={setIgUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INSTAGRAM GRAPH ACCESS TOKEN (OPTIONAL)</Text>
-                <TextInput
-                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="Optional: Live Graph API Access Token (or leave empty)"
-                  placeholderTextColor={colors.textSecondary}
-                  value={igAccessToken}
-                  onChangeText={setIgAccessToken}
-                  secureTextEntry={true}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
