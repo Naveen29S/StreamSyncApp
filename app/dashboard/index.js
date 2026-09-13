@@ -336,10 +336,11 @@ export default function DashboardIndex() {
                 styles.platformCard, 
                 { 
                   backgroundColor: colors.cardBg,
-                  borderColor: colors.border,
-                  borderTopWidth: 3, 
-                  borderTopColor: config.color,
-                  ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 32px rgba(255, 255, 255, 0.22)` : `0px 8px 24px ${config.color}15` } : {})
+                  borderColor: isDark ? 'transparent' : colors.border,
+                  borderTopWidth: isDark ? 0 : 3, 
+                  borderTopColor: isDark ? 'transparent' : config.color,
+                  borderWidth: isDark ? 0 : 1,
+                  ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0 10px 35px rgba(255, 255, 255, 0.25), 0 3px 14px rgba(255, 255, 255, 0.18)` : `0px 8px 24px ${config.color}15` } : {})
                 }
               ]}
             >

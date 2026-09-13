@@ -162,23 +162,67 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       cursor: pointer;
     }
 
-    /* Dark Mode: No outline border + high-intensity radiant white outer shadows */
+    /* Dark Mode: Completely borderless on all box grids + high-intensity radiant white outer shadows */
+    [data-theme="dark"] [data-grid-box="true"],
+    [data-theme="dark"] .streamsync-grid-box,
     html[data-theme="dark"] [data-grid-box="true"],
-    html[data-theme="dark"] .streamsync-grid-box {
-      border: 1px solid transparent !important;
+    html[data-theme="dark"] .streamsync-grid-box,
+    body[data-theme="dark"] [data-grid-box="true"],
+    body[data-theme="dark"] .streamsync-grid-box {
+      border: 0px solid transparent !important;
+      border-width: 0px !important;
+      border-top-width: 0px !important;
+      border-right-width: 0px !important;
+      border-bottom-width: 0px !important;
+      border-left-width: 0px !important;
+      border-color: transparent !important;
+      border-top-color: transparent !important;
+      border-right-color: transparent !important;
+      border-bottom-color: transparent !important;
+      border-left-color: transparent !important;
+      border-style: none !important;
+      border-top-style: none !important;
+      border-right-style: none !important;
+      border-bottom-style: none !important;
+      border-left-style: none !important;
       outline: none !important;
-      box-shadow: 0 8px 32px rgba(255, 255, 255, 0.22),
-                  0 2px 10px rgba(255, 255, 255, 0.12) !important;
+      outline-width: 0px !important;
+      outline-color: transparent !important;
+      box-shadow: 0 10px 35px rgba(255, 255, 255, 0.25),
+                  0 3px 14px rgba(255, 255, 255, 0.18),
+                  0 0 20px rgba(255, 255, 255, 0.12) !important;
     }
 
-    /* Dark Mode Hover: Lifts up (-5px), no outline, ultra-intense glowing white bloom */
+    /* Dark Mode Hover: Lifts up (-5px), zero border, ultra-intense glowing white bloom */
+    [data-theme="dark"] [data-grid-box="true"]:hover,
+    [data-theme="dark"] .streamsync-grid-box:hover,
     html[data-theme="dark"] [data-grid-box="true"]:hover,
-    html[data-theme="dark"] .streamsync-grid-box:hover {
+    html[data-theme="dark"] .streamsync-grid-box:hover,
+    body[data-theme="dark"] [data-grid-box="true"]:hover,
+    body[data-theme="dark"] .streamsync-grid-box:hover {
       transform: translateY(-5px) !important;
+      border: 0px solid transparent !important;
+      border-width: 0px !important;
+      border-top-width: 0px !important;
+      border-right-width: 0px !important;
+      border-bottom-width: 0px !important;
+      border-left-width: 0px !important;
       border-color: transparent !important;
+      border-top-color: transparent !important;
+      border-right-color: transparent !important;
+      border-bottom-color: transparent !important;
+      border-left-color: transparent !important;
+      border-style: none !important;
+      border-top-style: none !important;
+      border-right-style: none !important;
+      border-bottom-style: none !important;
+      border-left-style: none !important;
       outline: none !important;
-      box-shadow: 0 20px 50px rgba(255, 255, 255, 0.35),
-                  0 0 38px rgba(255, 255, 255, 0.28) !important;
+      outline-width: 0px !important;
+      outline-color: transparent !important;
+      box-shadow: 0 22px 55px rgba(255, 255, 255, 0.45),
+                  0 0 45px rgba(255, 255, 255, 0.35),
+                  0 0 20px rgba(255, 255, 255, 0.25) !important;
       cursor: pointer;
     }
   `;
@@ -230,8 +274,8 @@ export const THEME_COLORS = {
     sidebarBg: '#0d1321',
     topbarBg: '#0d1321',
     modalBg: '#131c2e',
-    border: 'rgba(255, 255, 255, 0.08)',
-    borderSubtle: 'rgba(255, 255, 255, 0.05)',
+    border: 'transparent',
+    borderSubtle: 'transparent',
     borderStrong: 'rgba(255, 255, 255, 0.16)',
     textPrimary: '#f8fafc',
     textSecondary: '#94a3b8',
@@ -249,7 +293,7 @@ export const THEME_COLORS = {
     badgeBg: '#1e293b',
     badgeText: '#cbd5e1',
     cardShadow: Platform.OS === 'web' 
-      ? { boxShadow: '0 8px 32px rgba(255, 255, 255, 0.22), 0 2px 10px rgba(255, 255, 255, 0.12)' } 
+      ? { boxShadow: '0 8px 32px rgba(255, 255, 255, 0.25), 0 2px 12px rgba(255, 255, 255, 0.15)' } 
       : { shadowColor: '#ffffff', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 8 },
     glowA: 'rgba(168, 85, 247, 0.22)',
     glowB: 'rgba(56, 189, 248, 0.18)',
