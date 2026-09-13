@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, normalizePlatformName, processSessionOAuthTokens } from '../../lib/api';
 import ConnectModal from '../../components/ConnectModal';
 import { useTheme } from '../../context/ThemeContext';
+import { useRefresh } from '../../context/RefreshContext';
 
 const PLATFORMS = {
   YouTube:    { color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
@@ -195,6 +196,14 @@ export default function DashboardIndex() {
   }
 
   const { colors, isDark } = useTheme();
+  const { registerRefreshListener, triggerRefresh, isRefreshing } = useRefresh();
+
+  // Subscribe to real-time manual or frequent auto refreshes
+  useEffect(() => {
+    return registerRefreshListener(async () => {
+      await reloadDashboardData();
+    });
+  }, [registerRefreshListener]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bodyBg }}>
@@ -207,6 +216,29 @@ export default function DashboardIndex() {
           <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Your Creator Dashboard</Text>
         </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[
+              styles.headerRefreshBtn, 
+              { 
+                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.85)' : '#f1f5f9', 
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#e2e8f0',
+              },
+              isRefreshing && { opacity: 0.7 }
+            ]} 
+            onPress={() => triggerRefresh(true)}
+            disabled={isRefreshing}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh real-time dashboard data"
+            title="Refresh dashboard data in real time"
+          >
+            <Text style={[styles.headerRefreshIcon, { color: isRefreshing ? '#a855f7' : colors.textPrimary }]}>
+              ↻
+            </Text>
+            <Text style={[styles.headerRefreshText, { color: colors.textPrimary }]}>
+              {isRefreshing ? 'Syncing...' : 'Real-Time Refresh'}
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.btnPrimaryBg }]} onPress={() => openConnectModal('YouTube')}>
             <Text style={[styles.headerBtnText, { color: colors.btnPrimaryText }]}>+ Connect Channel</Text>
           </TouchableOpacity>
@@ -329,10 +361,8 @@ export default function DashboardIndex() {
           }
 
           return (
-            <TouchableOpacity 
+            <View 
               key={name} 
-              activeOpacity={0.88}
-              onPress={() => openConnectModal(name)}
               dataSet={{ gridBox: 'true' }}
               style={[
                 styles.platformCard, 
@@ -342,7 +372,6 @@ export default function DashboardIndex() {
                   borderTopWidth: isDark ? 0 : 3, 
                   borderTopColor: isDark ? 'transparent' : config.color,
                   borderWidth: isDark ? 0 : 1,
-                  cursor: Platform.OS === 'web' ? 'pointer' : 'default',
                   ...(Platform.OS === 'web' ? { boxShadow: isDark ? '0 8px 30px rgba(0, 0, 0, 0.55)' : `0px 8px 24px ${config.color}15` } : {})
                 }
               ]}
@@ -357,18 +386,13 @@ export default function DashboardIndex() {
                   <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={2}>{statusText}</Text>
                 </View>
                 
-                {isConnected ? (
-                  <View 
+                {isConnected && (
+                  <TouchableOpacity 
+                    onPress={() => openConnectModal(name)} 
                     style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: colors.badgeBg, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
                   >
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>Manage ↗</Text>
-                  </View>
-                ) : (
-                  <View 
-                    style={{ marginRight: 12, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 12 }}
-                  >
-                    <Text style={{ fontSize: 12, color: colors.accent, fontWeight: '600' }}>Connect +</Text>
-                  </View>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>Manage</Text>
+                  </TouchableOpacity>
                 )}
                 <View style={[styles.statusDot, dotStyle]} />
               </View>
@@ -397,11 +421,11 @@ export default function DashboardIndex() {
                   </View>
                 </View>
               ) : (
-                <View style={[styles.connectPlatformBtn, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
+                <TouchableOpacity style={[styles.connectPlatformBtn, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]} onPress={() => openConnectModal(name)}>
                   <Text style={[styles.connectPlatformText, { color: colors.textSecondary }]}>Connect {name} →</Text>
-                </View>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           );
         })}
       </View>
@@ -582,7 +606,6 @@ export default function DashboardIndex() {
       onClose={() => setModalVisible(false)}
       initialPlatform={selectedPlatform}
       onSuccess={reloadDashboardData}
-      platformData={data}
     />
 
   </View>
@@ -619,7 +642,26 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 14, color: '#666', marginBottom: 4 },
   pageTitle: { fontSize: 26, fontWeight: '700', color: '#000', letterSpacing: -0.5 },
-  headerActions: { flexDirection: 'row', gap: 10 },
+  headerActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  headerRefreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
+  },
+  headerRefreshIcon: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  headerRefreshText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   headerBtn: {
     backgroundColor: '#000', paddingHorizontal: 18, paddingVertical: 10,
     borderRadius: 999,

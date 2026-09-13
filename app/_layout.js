@@ -5,6 +5,7 @@ import { useFonts, Quicksand_400Regular, Quicksand_500Medium, Quicksand_600SemiB
 import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
 import CursorEffect from '../components/CursorEffect';
 import { ThemeProvider } from '../context/ThemeContext';
+import { RefreshProvider } from '../context/RefreshContext';
 
 export default function Layout() {
   const [fontsLoaded] = useFonts({
@@ -47,12 +48,14 @@ export default function Layout() {
 
   return (
     <ThemeProvider>
-      <CursorEffect />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="auth" />
-        <Stack.Screen name="dashboard" />
-      </Stack>
+      <RefreshProvider>
+        <CursorEffect />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="auth" />
+          <Stack.Screen name="dashboard" />
+        </Stack>
+      </RefreshProvider>
     </ThemeProvider>
   );
 }

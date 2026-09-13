@@ -5,6 +5,7 @@ import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '.
 import { useRouter } from 'expo-router';
 import ConnectModal from '../../components/ConnectModal';
 import { useTheme } from '../../context/ThemeContext';
+import { useRefresh } from '../../context/RefreshContext';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -29,6 +30,7 @@ function formatCompactNumber(num) {
 
 export default function ContentScreen() {
   const { colors, isDark } = useTheme();
+  const { registerRefreshListener } = useRefresh();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState('All');
   const [posts, setPosts] = useState([]);
@@ -132,6 +134,11 @@ export default function ContentScreen() {
 
     loadContent();
 
+    // Subscribe to real-time manual or frequent auto refreshes
+    const unregisterRefresh = registerRefreshListener(async () => {
+      if (isMounted) await loadContent();
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted || !session) return;
 
@@ -155,6 +162,7 @@ export default function ContentScreen() {
 
     return () => {
       isMounted = false;
+      unregisterRefresh?.();
       if (subscription) {
         supabase.removeChannel(subscription);
         subscription = null;

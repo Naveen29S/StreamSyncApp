@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useRefresh } from '../../context/RefreshContext';
 
 const { width } = Dimensions.get('window');
 
@@ -165,6 +166,18 @@ export default function ConnectsScreen() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const { registerRefreshListener } = useRefresh();
+
+  // Subscribe to real-time manual or frequent auto refreshes
+  useEffect(() => {
+    return registerRefreshListener(async () => {
+      const { data: { session: s } } = await supabase.auth.getSession();
+      if (s) {
+        await fetchProfile(s.user.id);
+      }
+    });
+  }, [registerRefreshListener]);
 
   async function fetchProfile(userId) {
     const { data } = await supabase

@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import ConnectModal from '../../components/ConnectModal';
 import { useTheme } from '../../context/ThemeContext';
+import { useRefresh } from '../../context/RefreshContext';
 
 function formatCompactNumber(num) {
   if (num === null || num === undefined || isNaN(num)) return '0';
@@ -23,6 +24,7 @@ function formatCompactNumber(num) {
 
 export default function AnalyticsScreen() {
   const { colors, isDark } = useTheme();
+  const { registerRefreshListener } = useRefresh();
   const [timeframe, setTimeframe] = useState('7D');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,11 @@ export default function AnalyticsScreen() {
 
     loadData();
 
+    // Subscribe to real-time manual or frequent auto refreshes
+    const unregisterRefresh = registerRefreshListener(async () => {
+      if (isMounted) await loadData();
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted || !session) return;
 
@@ -116,6 +123,7 @@ export default function AnalyticsScreen() {
 
     return () => {
       isMounted = false;
+      unregisterRefresh?.();
       if (subscription) {
         supabase.removeChannel(subscription);
         subscription = null;

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Platform, TextInput, Image } from 'react-native';
 import { Slot, useRouter, usePathname, Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch } from '../../lib/api';
+import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch, syncPlatformData } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { useRefresh } from '../../context/RefreshContext';
 import ThemeToggle from '../../components/ThemeToggle';
+import RealtimeRefreshButton from '../../components/RealtimeRefreshButton';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'grid' },
@@ -146,7 +148,22 @@ export default function DashboardLayout() {
   };
 
   const { colors, isDark } = useTheme();
+  const { registerRefreshListener } = useRefresh();
   const userInitial = session?.user?.email?.[0]?.toUpperCase() || '?';
+
+  // Listen for real-time manual or automated frequent refreshes
+  useEffect(() => {
+    return registerRefreshListener(async () => {
+      const { data: { session: s } } = await supabase.auth.getSession();
+      if (s) {
+        const platforms = await fetchActivePlatforms(s);
+        setConnectedPlatforms(platforms);
+        if (platforms && platforms.length > 0) {
+          await syncPlatformData(platforms);
+        }
+      }
+    });
+  }, [registerRefreshListener]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
@@ -182,6 +199,9 @@ export default function DashboardLayout() {
         </View>
 
         <View style={styles.topbarRight}>
+          {/* Real-Time Live Refresh & Frequent Auto-Sync Button */}
+          <RealtimeRefreshButton style={{ marginRight: 6 }} />
+
           {/* Sync Status Indicator */}
           <View style={[styles.syncStatusPill, { backgroundColor: colors.badgeBg, borderColor: colors.border }]}>
             <View style={[styles.syncDot, { backgroundColor: connectedPlatforms.length > 0 ? '#10b981' : colors.accent }]} />
