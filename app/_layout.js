@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { Text, TextInput, Platform } from 'react-native';
 import { useFonts, Quicksand_400Regular, Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold } from '@expo-google-fonts/quicksand';
 import CursorEffect from '../components/CursorEffect';
+import { ThemeProvider } from '../context/ThemeContext';
 
 export default function Layout() {
   const [fontsLoaded] = useFonts({
@@ -42,13 +43,13 @@ export default function Layout() {
   }
 
   return (
-    <>
+    <ThemeProvider>
       <CursorEffect />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" />
         <Stack.Screen name="dashboard" />
       </Stack>
-    </>
+    </ThemeProvider>
   );
 }

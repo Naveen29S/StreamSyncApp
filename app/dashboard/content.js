@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import ConnectModal from '../../components/ConnectModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -27,6 +28,7 @@ function formatCompactNumber(num) {
 }
 
 export default function ContentScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState('All');
   const [posts, setPosts] = useState([]);
@@ -181,28 +183,28 @@ export default function ContentScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.pageTitle}>Content Library</Text>
-          <Text style={styles.pageSubtitle}>Manage and organize your posts across all platforms</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Content Library</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>Manage and organize your posts across all platforms</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity 
-            style={[styles.createBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee' }]}
+            style={[styles.createBtn, { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }]}
             onPress={handleSyncContent}
             disabled={syncing}
           >
-            <Text style={[styles.createBtnText, { color: '#000' }]}>
+            <Text style={[styles.createBtnText, { color: colors.textPrimary }]}>
               {syncing ? 'Syncing...' : '↻ Refresh Data'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.createBtn}
+            style={[styles.createBtn, { backgroundColor: colors.btnPrimaryBg }]}
             onPress={() => setConnectModalVisible(true)}
           >
-            <Text style={styles.createBtnIcon}>+</Text>
-            <Text style={styles.createBtnText}>Connect Channel</Text>
+            <Text style={[styles.createBtnIcon, { color: colors.btnPrimaryText }]}>+</Text>
+            <Text style={[styles.createBtnText, { color: colors.btnPrimaryText }]}>Connect Channel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -211,77 +213,85 @@ export default function ContentScreen() {
         {filters.map(f => (
           <TouchableOpacity 
             key={f} 
-            style={[styles.filterChip, activeFilter === f && styles.filterChipActive]}
+            style={[
+              styles.filterChip, 
+              { backgroundColor: colors.cardBg, borderColor: colors.border },
+              activeFilter === f && { backgroundColor: isDark ? colors.accent : '#000', borderColor: isDark ? colors.accent : '#000' }
+            ]}
             onPress={() => setActiveFilter(f)}
           >
-            <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{f}</Text>
+            <Text style={[
+              styles.filterText, 
+              { color: colors.textSecondary },
+              activeFilter === f && { color: '#ffffff' }
+            ]}>{f}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#9d50ff" />
-          <Text style={{ marginTop: 12, color: '#666' }}>Loading synced content...</Text>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading synced content...</Text>
         </View>
       ) : filteredPosts.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
           <Text style={{ fontSize: 36, marginBottom: 12 }}>🎬</Text>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#000', marginBottom: 8 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>
             {activeFilter === 'All' ? 'No Synced Videos or Posts' : `No ${activeFilter} Content`}
           </Text>
-          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', maxWidth: 360, marginBottom: 24, lineHeight: 22 }}>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', maxWidth: 360, marginBottom: 24, lineHeight: 22 }}>
             {connectedPlatforms.includes('yt')
               ? 'Your YouTube channel is connected and active. Once videos are published, they will sync and appear here automatically.'
               : 'Connect your YouTube channel to automatically sync your latest uploads, views, and engagement metrics.'}
           </Text>
           {connectedPlatforms.includes('yt') ? (
             <TouchableOpacity 
-              style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
+              style={{ backgroundColor: colors.btnPrimaryBg, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
               onPress={handleSyncContent}
               disabled={syncing}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+              <Text style={{ color: colors.btnPrimaryText, fontWeight: '700', fontSize: 14 }}>
                 {syncing ? 'Syncing...' : '↻ Refresh Channel Sync'}
               </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
-              style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
+              style={{ backgroundColor: colors.btnPrimaryBg, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 }}
               onPress={() => setConnectModalVisible(true)}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
+              <Text style={{ color: colors.btnPrimaryText, fontWeight: '700', fontSize: 14 }}>Connect YouTube Channel →</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.grid}>
           {filteredPosts.map(post => (
-            <View key={post.id} style={styles.card}>
+            <View key={post.id} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
               {post.thumbnail ? (
                 <Image source={{ uri: post.thumbnail }} style={styles.thumbnail} resizeMode="cover" />
               ) : (
-                <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+                <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: isDark ? '#1e293b' : 'rgba(157, 80, 255, 0.05)' }]}>
                   <Text style={styles.textPlaceholderIcon}>🎬</Text>
                 </View>
               )}
               
               <View style={styles.cardBody}>
                 <View style={styles.cardTopRow}>
-                  <View style={[styles.platformBadge, { backgroundColor: PLATFORM_COLORS[post.platform] ? (PLATFORM_COLORS[post.platform] + '1A') : 'rgba(0,0,0,0.06)' }]}>
-                    <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[post.platform] || '#333' }]} />
-                    <Text style={[styles.platformText, { color: PLATFORM_COLORS[post.platform] || '#333' }]}>{post.platform}</Text>
+                  <View style={[styles.platformBadge, { backgroundColor: PLATFORM_COLORS[post.platform] ? (PLATFORM_COLORS[post.platform] + (isDark ? '33' : '1A')) : colors.badgeBg }]}>
+                    <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[post.platform] || colors.textPrimary }]} />
+                    <Text style={[styles.platformText, { color: PLATFORM_COLORS[post.platform] || colors.textPrimary }]}>{post.platform}</Text>
                   </View>
                   <Text style={styles.statusText(post.status)}>{post.status}</Text>
                 </View>
                 
-                <Text style={styles.postTitle} numberOfLines={2}>{post.title}</Text>
+                <Text style={[styles.postTitle, { color: colors.textPrimary }]} numberOfLines={2}>{post.title}</Text>
                 
-                <View style={styles.cardFooter}>
-                  <Text style={styles.postDate}>{post.date}</Text>
+                <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.postDate, { color: colors.textSecondary }]}>{post.date}</Text>
                   <View style={styles.viewsContainer}>
-                    <Text style={styles.viewsIcon}>👁</Text>
-                    <Text style={styles.viewsText}>{post.views} views</Text>
+                    <Text style={[styles.viewsIcon, { color: colors.textSecondary }]}>👁</Text>
+                    <Text style={[styles.viewsText, { color: colors.textPrimary }]}>{post.views} views</Text>
                     {post.engagement && (
                       <Text style={[styles.viewsText, { color: '#10b981', marginLeft: 8 }]}>• {post.engagement}</Text>
                     )}

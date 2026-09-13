@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, normalizePlatformName, processSessionOAuthTokens } from '../../lib/api';
 import ConnectModal from '../../components/ConnectModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const PLATFORMS = {
   YouTube:    { color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
@@ -193,26 +194,28 @@ export default function DashboardIndex() {
     );
   }
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView style={styles.scroller} contentContainerStyle={styles.scrollContent}>
+    <View style={{ flex: 1, backgroundColor: colors.bodyBg }}>
+      <ScrollView style={[styles.scroller, { backgroundColor: colors.bodyBg }]} contentContainerStyle={styles.scrollContent}>
       
       {/* ─── Page Header ─── */}
       <View style={styles.pageHeader}>
         <View>
-          <Text style={styles.greeting}>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋</Text>
-          <Text style={styles.pageTitle}>Your Creator Dashboard</Text>
+          <Text style={[styles.greeting, { color: colors.textSecondary }]}>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Your Creator Dashboard</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => openConnectModal('YouTube')}>
-            <Text style={styles.headerBtnText}>+ Connect Channel</Text>
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.btnPrimaryBg }]} onPress={() => openConnectModal('YouTube')}>
+            <Text style={[styles.headerBtnText, { color: colors.btnPrimaryText }]}>+ Connect Channel</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── Connected Platforms Quick Status ─── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingHorizontal: 30 }}>
-        <Text style={{ fontSize: 13, color: '#666', marginRight: 12, fontWeight: '600' }}>Active Connections:</Text>
+        <Text style={{ fontSize: 13, color: colors.textSecondary, marginRight: 12, fontWeight: '600' }}>Active Connections:</Text>
         {connectedPlatforms.length === 0 ? (
           <TouchableOpacity onPress={() => openConnectModal('YouTube')}>
             <Text style={{ fontSize: 13, color: '#ff6b6b', fontWeight: '500' }}>None. Click to connect YouTube.</Text>
@@ -234,48 +237,48 @@ export default function DashboardIndex() {
 
       {/* ─── Aggregated Stats Row ─── */}
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
-            <Text style={styles.statLabel}>Total Reach</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Reach</Text>
             <Text style={styles.statTrendUp}>{data.overview.totalViews > 0 ? '↑ Live' : '—'}</Text>
           </View>
-          <Text style={styles.statValue}>{data.overview.totalViews.toLocaleString()}</Text>
-          <Text style={styles.statCaption}>Combined views across all platforms</Text>
+          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.totalViews.toLocaleString()}</Text>
+          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Combined views across all platforms</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
-            <Text style={styles.statLabel}>Audience</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Audience</Text>
             <Text style={styles.statTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Active' : '—'}</Text>
           </View>
-          <Text style={styles.statValue}>{data.overview.totalFollowers.toLocaleString()}</Text>
-          <Text style={styles.statCaption}>Followers & subscribers unified</Text>
+          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.totalFollowers.toLocaleString()}</Text>
+          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Followers & subscribers unified</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
-            <Text style={styles.statLabel}>Engagement</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Engagement</Text>
             <Text style={styles.statTrendUp}>
               {parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time' : '—'}
             </Text>
           </View>
-          <Text style={styles.statValue}>{data.overview.engagementRate || '0.0%'}</Text>
-          <Text style={styles.statCaption}>Average across connected platforms</Text>
+          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.engagementRate || '0.0%'}</Text>
+          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Average across connected platforms</Text>
         </View>
 
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.statHeader}>
-            <Text style={styles.statLabel}>Revenue</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Revenue</Text>
             {data.overview.estimatedRevenue >= 0 && (
               <Text style={styles.statTrendUp}>↑ Est.</Text>
             )}
           </View>
-          <Text style={styles.statValue}>
+          <Text style={[styles.statValue, { color: colors.textPrimary }]}>
             {data.overview.estimatedRevenue < 0 
               ? "Unmonetized" 
               : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
           </Text>
-          <Text style={styles.statCaption}>
+          <Text style={[styles.statCaption, { color: colors.textMuted }]}>
             {data.overview.estimatedRevenue < 0 
               ? "Grow your audience to monetize" 
               : "Estimated from monetized platforms"}
@@ -285,8 +288,8 @@ export default function DashboardIndex() {
 
       {/* ─── Platform Breakdown Cards ─── */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Platform Performance</Text>
-        <Text style={styles.sectionSub}>Real-time sync status for each connected platform</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Platform Performance</Text>
+        <Text style={[styles.sectionSub, { color: colors.textSecondary }]}>Real-time sync status for each connected platform</Text>
       </View>
 
       <View style={styles.platformGrid}>
@@ -306,7 +309,7 @@ export default function DashboardIndex() {
               dotStyle = styles.statusDotLive;
             } else {
               statusText = 'Connected (Sync Ready)';
-              dotStyle = { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9d50ff' };
+              dotStyle = { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent };
             }
           }
 
@@ -314,27 +317,29 @@ export default function DashboardIndex() {
             <View key={name} style={[
               styles.platformCard, 
               { 
+                backgroundColor: colors.cardBg,
+                borderColor: colors.border,
                 borderTopWidth: 3, 
                 borderTopColor: config.color,
-                ...(Platform.OS === 'web' ? { boxShadow: `0px 8px 24px ${config.color}15` } : {})
+                ...(Platform.OS === 'web' ? { boxShadow: isDark ? `0px 8px 24px rgba(0,0,0,0.5)` : `0px 8px 24px ${config.color}15` } : {})
               }
             ]}>
               {/* Platform Header */}
               <View style={styles.platformCardHeader}>
                 <View style={[styles.platformIconCircle, { backgroundColor: config.bg, padding: 0 }]}>
-                  <Image source={{ uri: config.logo }} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                  <Image source={{ uri: config.logo }} style={{ width: 22, height: 22, tintColor: (name === 'X (Twitter)' && isDark) ? '#ffffff' : undefined }} resizeMode="contain" />
                 </View>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.platformCardName} numberOfLines={1}>{name}</Text>
-                  <Text style={styles.platformCardSyncTime} numberOfLines={2}>{statusText}</Text>
+                  <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                  <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={2}>{statusText}</Text>
                 </View>
                 
                 {isConnected && (
                   <TouchableOpacity 
                     onPress={() => openConnectModal(name)} 
-                    style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#f5f5f5', borderRadius: 12, borderWidth: 1, borderColor: '#eee' }}
+                    style={{ marginRight: 12, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: colors.badgeBg, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
                   >
-                    <Text style={{ fontSize: 12, color: '#555', fontWeight: '600' }}>Manage</Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '600' }}>Manage</Text>
                   </TouchableOpacity>
                 )}
                 <View style={[styles.statusDot, dotStyle]} />
@@ -343,29 +348,29 @@ export default function DashboardIndex() {
               {isConnected ? (
                 <View style={styles.platformMetrics}>
                   <View style={styles.platformMetricItem}>
-                    <Text style={styles.platformMetricVal}>
+                    <Text style={[styles.platformMetricVal, { color: colors.textPrimary }]}>
                       {stats?.followers || '0'}
                     </Text>
-                    <Text style={styles.platformMetricLabel}>Followers</Text>
+                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Followers</Text>
                   </View>
-                  <View style={styles.platformMetricDivider} />
+                  <View style={[styles.platformMetricDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.platformMetricItem}>
-                    <Text style={styles.platformMetricVal}>
+                    <Text style={[styles.platformMetricVal, { color: colors.textPrimary }]}>
                       {stats?.views || '0'}
                     </Text>
-                    <Text style={styles.platformMetricLabel}>Views</Text>
+                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Views</Text>
                   </View>
-                  <View style={styles.platformMetricDivider} />
+                  <View style={[styles.platformMetricDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.platformMetricItem}>
-                    <Text style={styles.platformMetricVal}>
+                    <Text style={[styles.platformMetricVal, { color: colors.textPrimary }]}>
                       {stats?.engage || '0.0%'}
                     </Text>
-                    <Text style={styles.platformMetricLabel}>Engage</Text>
+                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Engage</Text>
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.connectPlatformBtn} onPress={() => openConnectModal(name)}>
-                  <Text style={styles.connectPlatformText}>Connect {name} →</Text>
+                <TouchableOpacity style={[styles.connectPlatformBtn, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]} onPress={() => openConnectModal(name)}>
+                  <Text style={[styles.connectPlatformText, { color: colors.textSecondary }]}>Connect {name} →</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -375,15 +380,23 @@ export default function DashboardIndex() {
 
       {/* ─── Content Feed ─── */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Cross-Platform Content</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Cross-Platform Content</Text>
         <View style={styles.tabRow}>
           {['all', 'YouTube', 'Twitch', 'Instagram', 'X'].map((tab) => (
             <TouchableOpacity 
               key={tab} 
-              style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
+              style={[
+                styles.tabBtn, 
+                { backgroundColor: colors.badgeBg, borderColor: colors.border },
+                activeTab === tab && [styles.tabBtnActive, { backgroundColor: colors.btnPrimaryBg, borderColor: colors.btnPrimaryBg }]
+              ]}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
+              <Text style={[
+                styles.tabBtnText, 
+                { color: colors.textSecondary },
+                activeTab === tab && [styles.tabBtnTextActive, { color: colors.btnPrimaryText }]
+              ]}>
                 {tab === 'all' ? 'All Platforms' : tab}
               </Text>
             </TouchableOpacity>
@@ -406,24 +419,24 @@ export default function DashboardIndex() {
               : connectedPlatforms.some(p => isPlatformMatch(p, activeTab));
 
             return (
-              <View style={styles.emptyState}>
+              <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderRadius: 16, borderWidth: 1, borderColor: colors.border, marginVertical: 8 }]}>
                 <Text style={styles.emptyIcon}>◫</Text>
-                <Text style={styles.emptyTitle}>
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
                   {activeTab === 'all'
                     ? (isAnyConnected ? 'No content published yet' : 'No content synced yet')
                     : (isTabConnected ? `No ${activeTab} content published yet` : `No ${activeTab} content synced yet`)}
                 </Text>
-                <Text style={styles.emptySub}>
+                <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
                   {activeTab === 'all'
                     ? (isAnyConnected ? 'Your connected accounts are active. Videos or posts will appear here once published.' : 'Connect your platforms above to start seeing your content here.')
                     : (isTabConnected ? `Your ${activeTab} account is connected. New uploads will sync and appear here automatically.` : `Connect your ${activeTab} account in Platforms to start seeing your posts here.`)}
                 </Text>
                 {!isTabConnected && (
                   <TouchableOpacity 
-                    style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#f0f2f5', borderRadius: 8 }}
+                    style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.badgeBg, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}
                     onPress={() => openConnectModal(activeTab === 'all' ? 'YouTube' : activeTab)}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#111' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }}>
                       + Connect {activeTab === 'all' ? 'Channel' : activeTab}
                     </Text>
                   </TouchableOpacity>
@@ -435,9 +448,9 @@ export default function DashboardIndex() {
           return filteredContent.map((item) => {
             const platformConf = PLATFORMS[item.platform] || { color: '#5a6270', bg: 'rgba(255,255,255,0.04)', icon: '?' };
             return (
-              <View key={item.id} style={styles.contentRow}>
+              <View key={item.id} style={[styles.contentRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 {/* Thumbnail */}
-                <View style={styles.contentThumb}>
+                <View style={[styles.contentThumb, { backgroundColor: colors.inputBg }]}>
                   {item.thumbnail ? (
                     <Image source={{ uri: item.thumbnail }} style={styles.thumbImg} />
                   ) : (
@@ -448,18 +461,18 @@ export default function DashboardIndex() {
                 </View>
                 {/* Info */}
                 <View style={styles.contentInfo}>
-                  <Text style={styles.contentTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={[styles.contentTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
                   <View style={styles.contentMeta}>
                     <View style={[styles.contentPlatformChip, { backgroundColor: platformConf.bg }]}>
                       <Text style={[styles.contentPlatformChipText, { color: platformConf.color }]}>{item.platform}</Text>
                     </View>
-                    <Text style={styles.contentMetaText}>{item.views} views</Text>
+                    <Text style={[styles.contentMetaText, { color: colors.textSecondary }]}>{item.views} views</Text>
                     <Text style={[styles.contentMetaText, { color: '#10b981' }]}>• {item.engage} engage</Text>
                   </View>
                 </View>
                 {/* Actions */}
-                <TouchableOpacity style={styles.contentActionBtn}>
-                  <Text style={styles.contentActionText}>↗</Text>
+                <TouchableOpacity style={[styles.contentActionBtn, { backgroundColor: colors.badgeBg }]}>
+                  <Text style={[styles.contentActionText, { color: colors.textSecondary }]}>↗</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -470,24 +483,24 @@ export default function DashboardIndex() {
       {/* ─── Activity Stream ─── */}
       <View style={styles.twoCol}>
         {/* Recent Comments */}
-        <View style={[styles.sectionCard, { flex: 1 }]}>
+        <View style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.sectionCardHeader}>
-            <Text style={styles.sectionCardTitle}>Activity Feed</Text>
+            <Text style={[styles.sectionCardTitle, { color: colors.textPrimary }]}>Activity Feed</Text>
             <Text style={styles.sectionCardAction}>View all →</Text>
           </View>
           {data.recentComments.length === 0 ? (
-            <Text style={styles.emptySmall}>No recent activity</Text>
+            <Text style={[styles.emptySmall, { color: colors.textMuted }]}>No recent activity</Text>
           ) : (
             data.recentComments.map((c) => {
               const pConf = PLATFORMS[c.platform] || { color: '#5a6270', bg: 'rgba(255,255,255,0.04)' };
               return (
-                <View key={c.id} style={styles.activityRow}>
+                <View key={c.id} style={[styles.activityRow, { borderBottomColor: colors.border }]}>
                   <View style={[styles.activityDot, { backgroundColor: pConf.color }]} />
                   <View style={styles.activityBody}>
-                    <Text style={styles.activityUser}>{c.user} <Text style={styles.activityAction}>commented</Text></Text>
-                    <Text style={styles.activityText} numberOfLines={1}>{c.text}</Text>
+                    <Text style={[styles.activityUser, { color: colors.textPrimary }]}>{c.user} <Text style={[styles.activityAction, { color: colors.textSecondary }]}>commented</Text></Text>
+                    <Text style={[styles.activityText, { color: colors.textSecondary }]} numberOfLines={1}>{c.text}</Text>
                   </View>
-                  <Text style={styles.activityTime}>{c.time}</Text>
+                  <Text style={[styles.activityTime, { color: colors.textMuted }]}>{c.time}</Text>
                 </View>
               );
             })
@@ -495,40 +508,40 @@ export default function DashboardIndex() {
         </View>
 
         {/* Quick Actions */}
-        <View style={[styles.sectionCard, { flex: 1 }]}>
-          <Text style={styles.sectionCardTitle}>Quick Actions</Text>
+        <View style={[styles.sectionCard, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.sectionCardTitle, { color: colors.textPrimary }]}>Quick Actions</Text>
           
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={[styles.qaIcon, { backgroundColor: 'rgba(0,229,255,0.08)' }]}>
+          <TouchableOpacity style={[styles.quickAction, { borderBottomColor: colors.border }]}>
+            <View style={[styles.qaIcon, { backgroundColor: 'rgba(0,229,255,0.12)' }]}>
               <Text style={styles.qaIconText}>📤</Text>
             </View>
             <View style={styles.qaBody}>
-              <Text style={styles.qaTitle}>Cross-Post Content</Text>
-              <Text style={styles.qaDesc}>Publish to multiple platforms at once</Text>
+              <Text style={[styles.qaTitle, { color: colors.textPrimary }]}>Cross-Post Content</Text>
+              <Text style={[styles.qaDesc, { color: colors.textSecondary }]}>Publish to multiple platforms at once</Text>
             </View>
-            <Text style={styles.qaArrow}>→</Text>
+            <Text style={[styles.qaArrow, { color: colors.textMuted }]}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={[styles.qaIcon, { backgroundColor: 'rgba(225,48,108,0.08)' }]}>
+          <TouchableOpacity style={[styles.quickAction, { borderBottomColor: colors.border }]}>
+            <View style={[styles.qaIcon, { backgroundColor: 'rgba(225,48,108,0.12)' }]}>
               <Text style={styles.qaIconText}>📊</Text>
             </View>
             <View style={styles.qaBody}>
-              <Text style={styles.qaTitle}>Generate Report</Text>
-              <Text style={styles.qaDesc}>Unified analytics across platforms</Text>
+              <Text style={[styles.qaTitle, { color: colors.textPrimary }]}>Generate Report</Text>
+              <Text style={[styles.qaDesc, { color: colors.textSecondary }]}>Unified analytics across platforms</Text>
             </View>
-            <Text style={styles.qaArrow}>→</Text>
+            <Text style={[styles.qaArrow, { color: colors.textMuted }]}>→</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickAction} onPress={() => openConnectModal('YouTube')}>
-            <View style={[styles.qaIcon, { backgroundColor: 'rgba(10,102,194,0.08)' }]}>
+          <TouchableOpacity style={[styles.quickAction, { borderBottomColor: colors.border }]} onPress={() => openConnectModal('YouTube')}>
+            <View style={[styles.qaIcon, { backgroundColor: 'rgba(10,102,194,0.12)' }]}>
               <Text style={styles.qaIconText}>🔗</Text>
             </View>
             <View style={styles.qaBody}>
-              <Text style={styles.qaTitle}>Connect Platform</Text>
-              <Text style={styles.qaDesc}>Add a new social account to sync</Text>
+              <Text style={[styles.qaTitle, { color: colors.textPrimary }]}>Connect Platform</Text>
+              <Text style={[styles.qaDesc, { color: colors.textSecondary }]}>Add a new social account to sync</Text>
             </View>
-            <Text style={styles.qaArrow}>→</Text>
+            <Text style={[styles.qaArrow, { color: colors.textMuted }]}>→</Text>
           </TouchableOpacity>
         </View>
       </View>

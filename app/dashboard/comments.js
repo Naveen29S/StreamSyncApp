@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { normalizePlatformName, normalizePlatformKey, syncPlatformData } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import ConnectModal from '../../components/ConnectModal';
+import { useTheme } from '../../context/ThemeContext';
 
 const PLATFORM_COLORS = {
   'YouTube': '#FF0000',
@@ -30,6 +31,7 @@ function formatRelativeTime(dateStr) {
 }
 
 export default function CommentsScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [comments, setComments] = useState([]);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
@@ -207,29 +209,29 @@ export default function CommentsScreen() {
   const currentReplies = activeComment ? (repliedComments[activeComment.id] || []) : [];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.pageTitle}>Inbox</Text>
-          <Text style={styles.pageSubtitle}>Respond to your community across all platforms</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Inbox</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>Respond to your community across all platforms</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           <TouchableOpacity 
-            style={styles.refreshBtn} 
+            style={[styles.refreshBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }]} 
             onPress={handleSyncComments}
             disabled={syncing}
           >
-            <Text style={styles.refreshBtnText}>{syncing ? 'Syncing...' : '↻ Refresh'}</Text>
+            <Text style={[styles.refreshBtnText, { color: colors.textPrimary }]}>{syncing ? 'Syncing...' : '↻ Refresh'}</Text>
           </TouchableOpacity>
-          <View style={styles.headerFilters}>
+          <View style={[styles.headerFilters, { backgroundColor: colors.badgeBg }]}>
             {['All', 'Unread', 'YouTube', 'Twitch', 'X (Twitter)'].map(f => (
               <TouchableOpacity 
                 key={f}
-                style={[styles.filterBtn, activeFilter === f && styles.filterBtnActive]}
+                style={[styles.filterBtn, activeFilter === f && [styles.filterBtnActive, { backgroundColor: colors.cardBg }]]}
                 onPress={() => setActiveFilter(f)}
               >
-                <Text style={[styles.filterBtnText, activeFilter === f && styles.filterBtnTextActive]}>
+                <Text style={[styles.filterBtnText, { color: colors.textSecondary }, activeFilter === f && [styles.filterBtnTextActive, { color: colors.textPrimary }]]}>
                   {f === 'Unread' ? `Unread (${comments.filter(c => c.unread && !resolvedMap[c.id]).length})` : f}
                 </Text>
               </TouchableOpacity>
@@ -239,37 +241,37 @@ export default function CommentsScreen() {
       </View>
 
       {/* Main Inbox Container */}
-      <View style={styles.inboxWrapper}>
+      <View style={[styles.inboxWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
         {/* Left List */}
-        <View style={styles.inboxList}>
+        <View style={[styles.inboxList, { backgroundColor: colors.cardBg, borderRightColor: colors.border }]}>
           {loading ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#9d50ff" />
-              <Text style={{ marginTop: 8, color: '#888', fontSize: 13 }}>Loading inbox...</Text>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={{ marginTop: 8, color: colors.textSecondary, fontSize: 13 }}>Loading inbox...</Text>
             </View>
           ) : filteredComments.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#000', marginBottom: 4 }}>No Comments Found</Text>
-              <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }}>No Comments Found</Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>
                 {connectedPlatforms.includes('yt')
                   ? 'Your YouTube channel is connected. Comments from viewers will appear here when posted on your videos.'
                   : 'Connect your YouTube channel to view audience comments.'}
               </Text>
               {connectedPlatforms.includes('yt') ? (
                 <TouchableOpacity 
-                  style={styles.connectLinkBtn}
+                  style={[styles.connectLinkBtn, { backgroundColor: colors.btnPrimaryBg }]}
                   onPress={handleSyncComments}
                   disabled={syncing}
                 >
-                  <Text style={styles.connectLinkText}>{syncing ? 'Syncing...' : '↻ Refresh Comments'}</Text>
+                  <Text style={[styles.connectLinkText, { color: colors.btnPrimaryText }]}>{syncing ? 'Syncing...' : '↻ Refresh Comments'}</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity 
-                  style={styles.connectLinkBtn}
+                  style={[styles.connectLinkBtn, { backgroundColor: colors.btnPrimaryBg }]}
                   onPress={() => setConnectModalVisible(true)}
                 >
-                  <Text style={styles.connectLinkText}>Connect YouTube →</Text>
+                  <Text style={[styles.connectLinkText, { color: colors.btnPrimaryText }]}>Connect YouTube →</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -282,17 +284,21 @@ export default function CommentsScreen() {
                 return (
                   <TouchableOpacity 
                     key={c.id} 
-                    style={[styles.commentRow, isActive && styles.commentRowActive]}
+                    style={[
+                      styles.commentRow, 
+                      { borderBottomColor: colors.border },
+                      isActive && [styles.commentRowActive, { backgroundColor: isDark ? colors.accent : '#000' }]
+                    ]}
                     onPress={() => setActiveId(c.id)}
                   >
                     <View style={styles.rowHeader}>
-                      <Text style={[styles.rowUser, isActive && styles.textWhite]} numberOfLines={1}>{c.user}</Text>
-                      <Text style={[styles.rowTime, isActive && styles.textWhite70]}>{c.time}</Text>
+                      <Text style={[styles.rowUser, { color: colors.textPrimary }, isActive && styles.textWhite]} numberOfLines={1}>{c.user}</Text>
+                      <Text style={[styles.rowTime, { color: colors.textSecondary }, isActive && styles.textWhite70]}>{c.time}</Text>
                     </View>
                     <Text style={[{ fontSize: 11, fontWeight: '700', marginBottom: 6, color: isActive ? 'rgba(255,255,255,0.8)' : c.color }]}>
                       {c.platform}
                     </Text>
-                    <Text style={[styles.rowText, isActive && styles.textWhite]} numberOfLines={2}>{c.text}</Text>
+                    <Text style={[styles.rowText, { color: colors.textSecondary }, isActive && styles.textWhite]} numberOfLines={2}>{c.text}</Text>
                     {c.unread && !isActive && !cResolved && <View style={styles.unreadDot} />}
                     {cResolved && (
                       <View style={[styles.resolvedBadge, isActive && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
@@ -307,21 +313,21 @@ export default function CommentsScreen() {
         </View>
 
         {/* Right Detail Pane */}
-        <View style={styles.inboxDetail}>
+        <View style={[styles.inboxDetail, { backgroundColor: isDark ? colors.cardBg : '#fafafa' }]}>
           {activeComment ? (
             <View style={styles.detailInner}>
-              <View style={styles.detailHeader}>
+              <View style={[styles.detailHeader, { backgroundColor: colors.cardBg, borderBottomColor: colors.border }]}>
                 <View style={styles.detailUserWrap}>
                   {activeComment.avatar ? (
                     <Image source={{ uri: activeComment.avatar }} style={styles.detailAvatarImg} />
                   ) : (
-                    <View style={styles.detailAvatar}>
-                      <Text style={styles.detailAvatarText}>{activeComment.user[0]}</Text>
+                    <View style={[styles.detailAvatar, { backgroundColor: colors.badgeBg }]}>
+                      <Text style={[styles.detailAvatarText, { color: colors.textPrimary }]}>{activeComment.user[0]}</Text>
                     </View>
                   )}
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={styles.detailUserName}>{activeComment.user}</Text>
-                    <Text style={styles.detailMeta} numberOfLines={1}>
+                    <Text style={[styles.detailUserName, { color: colors.textPrimary }]}>{activeComment.user}</Text>
+                    <Text style={[styles.detailMeta, { color: colors.textSecondary }]} numberOfLines={1}>
                       via {activeComment.platform} • on "{activeComment.videoTitle}" • {activeComment.time} ago
                     </Text>
                   </View>
@@ -337,30 +343,30 @@ export default function CommentsScreen() {
               </View>
 
               <ScrollView style={styles.chatArea}>
-                <View style={styles.chatBubbleRecv}>
-                  <Text style={styles.chatTextRecv}>{activeComment.text}</Text>
-                  <Text style={styles.chatTimestamp}>{activeComment.time} ago</Text>
+                <View style={[styles.chatBubbleRecv, { backgroundColor: isDark ? '#1e293b' : '#fff', borderColor: colors.border }]}>
+                  <Text style={[styles.chatTextRecv, { color: colors.textPrimary }]}>{activeComment.text}</Text>
+                  <Text style={[styles.chatTimestamp, { color: colors.textSecondary }]}>{activeComment.time} ago</Text>
                 </View>
 
                 {currentReplies.map((r, i) => (
-                  <View key={i} style={styles.chatBubbleSent}>
+                  <View key={i} style={[styles.chatBubbleSent, { backgroundColor: colors.accent }]}>
                     <Text style={styles.chatTextSent}>{r}</Text>
                     <Text style={styles.chatTimestampSent}>Just now</Text>
                   </View>
                 ))}
               </ScrollView>
 
-              <View style={styles.replyArea}>
+              <View style={[styles.replyArea, { backgroundColor: colors.cardBg, borderTopColor: colors.border }]}>
                 <TextInput 
-                  style={styles.replyInput}
+                  style={[styles.replyInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                   placeholder={`Reply to ${activeComment.user}...`}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   value={replyText}
                   onChangeText={setReplyText}
                   multiline
                 />
                 <TouchableOpacity 
-                  style={[styles.sendBtn, !replyText.trim() && { opacity: 0.6 }]}
+                  style={[styles.sendBtn, { backgroundColor: colors.accent }, !replyText.trim() && { opacity: 0.6 }]}
                   onPress={handleSendReply}
                   disabled={!replyText.trim()}
                 >
@@ -370,7 +376,7 @@ export default function CommentsScreen() {
             </View>
           ) : (
             <View style={styles.emptyDetail}>
-              <Text style={styles.emptyDetailText}>Select a conversation from the left to view details</Text>
+              <Text style={[styles.emptyDetailText, { color: colors.textSecondary }]}>Select a conversation from the left to view details</Text>
             </View>
           )}
         </View>

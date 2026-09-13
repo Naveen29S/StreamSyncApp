@@ -4,6 +4,8 @@ import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInUp, FadeIn, Layout } from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../context/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 const { width } = Dimensions.get('window');
 
@@ -149,37 +151,49 @@ export default function AuthScreen() {
     }
   }
 
-  return (
-    <View style={styles.container}>
-      {/* Subtle background glows matching dashboard cyan */}
-      <View style={styles.glowA} pointerEvents="none" />
-      <View style={styles.glowB} pointerEvents="none" />
+  const { colors, isDark } = useTheme();
 
-      {/* Back link */}
-      <Animated.View entering={FadeIn.delay(300)} style={styles.backButton}>
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Subtle background glows */}
+      <View style={[styles.glowA, { backgroundColor: colors.glowA }]} pointerEvents="none" />
+      <View style={[styles.glowB, { backgroundColor: colors.glowB }]} pointerEvents="none" />
+
+      {/* Top Bar with Back Link & Corner Day/Dark Mode Toggle */}
+      <View style={{
+        position: 'absolute',
+        top: 24,
+        left: 20,
+        right: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 20,
+      }}>
         <Link href="/" asChild>
-          <TouchableOpacity>
-            <Text style={styles.backText}>← Back</Text>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <Text style={[styles.backText, { color: colors.textSecondary }]}>← Back to Home</Text>
           </TouchableOpacity>
         </Link>
-      </Animated.View>
+        <ThemeToggle size="small" />
+      </View>
 
       {/* Brand */}
-      <Animated.View entering={FadeInUp.duration(600)} style={styles.brandRow}>
+      <Animated.View entering={FadeInUp.duration(600)} style={[styles.brandRow, { marginTop: 40 }]}>
         <Image
           source={require('../assets/logo-mark.png')}
           style={styles.authLogoIcon}
           resizeMode="contain"
         />
-        <Text style={styles.authBrandName}>StreamSync</Text>
+        <Text style={[styles.authBrandName, { color: colors.textPrimary }]}>StreamSync</Text>
       </Animated.View>
 
       {/* Auth Card */}
-      <Animated.View layout={Layout.springify()} entering={FadeInUp.delay(100).duration(800)} style={styles.authCard}>
-        <Animated.Text layout={Layout.springify()} style={styles.title}>
+      <Animated.View layout={Layout.springify()} entering={FadeInUp.delay(100).duration(800)} style={[styles.authCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <Animated.Text layout={Layout.springify()} style={[styles.title, { color: colors.textPrimary }]}>
           {isSignUp ? 'Create Account' : 'Welcome Back'}
         </Animated.Text>
-        <Animated.Text layout={Layout.springify()} style={styles.subtitle}>
+        <Animated.Text layout={Layout.springify()} style={[styles.subtitle, { color: colors.textSecondary }]}>
           {isSignUp ? 'Join StreamSync and sync your platforms.' : 'Sign in to your creator hub.'}
         </Animated.Text>
 
@@ -198,7 +212,7 @@ export default function AuthScreen() {
 
         {/* Continue with Google */}
         <TouchableOpacity 
-          style={styles.googleButton} 
+          style={[styles.googleButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]} 
           onPress={handleGoogleSignIn} 
           disabled={loading}
         >
@@ -207,21 +221,21 @@ export default function AuthScreen() {
             style={styles.googleIcon} 
             resizeMode="contain" 
           />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
+          <Text style={[styles.googleButtonText, { color: colors.textPrimary }]}>Continue with Google</Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.textMuted }]}>OR</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>EMAIL</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>EMAIL</Text>
           <TextInput 
-            style={styles.input} 
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.textPrimary }]} 
             placeholder="you@example.com" 
-            placeholderTextColor="#5a6270"
+            placeholderTextColor={colors.textMuted}
             value={email}
             onChangeText={(text) => {
               setEmail(text);
@@ -233,11 +247,11 @@ export default function AuthScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>PASSWORD</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>PASSWORD</Text>
           <TextInput 
-            style={[styles.input, passwordError ? { borderColor: '#ff4b91' } : null]} 
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.textPrimary }, passwordError ? { borderColor: '#ff4b91' } : null]} 
             placeholder="••••••••" 
-            placeholderTextColor="#5a6270"
+            placeholderTextColor={colors.textMuted}
             secureTextEntry
             value={password}
             onChangeText={(text) => {
@@ -255,17 +269,17 @@ export default function AuthScreen() {
 
         {isSignUp && (
           <Animated.View entering={FadeInUp} style={styles.inputContainer}>
-            <Text style={styles.label}>DATE OF BIRTH</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>DATE OF BIRTH</Text>
             {Platform.OS === 'web' ? (
               <input 
                 type="date"
                 style={{
-                  backgroundColor: '#f8f8f8',
+                  backgroundColor: colors.inputBg,
                   padding: '16px 18px',
                   borderRadius: 8,
                   fontSize: 14,
-                  color: '#000',
-                  border: '1px solid #eee',
+                  color: colors.textPrimary,
+                  border: `1px solid ${colors.inputBorder}`,
                   outline: 'none',
                   fontFamily: 'inherit',
                   width: '100%',
@@ -276,9 +290,9 @@ export default function AuthScreen() {
               />
             ) : (
               <TextInput 
-                style={styles.input} 
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.textPrimary }]} 
                 placeholder="YYYY-MM-DD" 
-                placeholderTextColor="#5a6270"
+                placeholderTextColor={colors.textMuted}
                 value={dob}
                 onChangeText={setDob}
               />
@@ -287,21 +301,21 @@ export default function AuthScreen() {
         )}
 
         <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
+          style={[styles.button, { backgroundColor: colors.btnPrimaryBg }, loading && styles.buttonDisabled]} 
           onPress={handleAuthentication} 
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
+          <Text style={[styles.buttonText, { color: colors.btnPrimaryText }]}>
             {loading ? 'SYNCING...' : (isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN')}
           </Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
             {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
           </Text>
           <TouchableOpacity onPress={handleToggleMode} disabled={loading}>
-            <Text style={styles.footerLink}>
+            <Text style={[styles.footerLink, { color: colors.accent }]}>
               {isSignUp ? 'Sign in' : 'Sign up'}
             </Text>
           </TouchableOpacity>

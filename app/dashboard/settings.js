@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, TextInput, Platform, Switch } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState('Account');
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
@@ -22,71 +24,102 @@ export default function SettingsScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
       <View style={styles.header}>
-        <Text style={styles.pageTitle}>Settings</Text>
-        <Text style={styles.pageSubtitle}>Manage your account preferences and integrations</Text>
+        <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Settings</Text>
+        <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>Manage your account preferences and integrations</Text>
       </View>
 
-      <View style={styles.settingsWrapper}>
+      <View style={[styles.settingsWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
         
         {/* Left Sidebar Menu */}
-        <View style={styles.settingsMenu}>
+        <View style={[styles.settingsMenu, { backgroundColor: isDark ? colors.sidebarBg : '#fafafa', borderRightColor: colors.border }]}>
           {['Account', 'Notifications', 'Billing', 'Integrations'].map((tab) => (
             <TouchableOpacity 
               key={tab} 
-              style={[styles.menuBtn, activeTab === tab && styles.menuBtnActive]}
+              style={[
+                styles.menuBtn, 
+                activeTab === tab && [styles.menuBtnActive, { backgroundColor: isDark ? colors.accent : '#000' }]
+              ]}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.menuBtnText, activeTab === tab && styles.menuBtnTextActive]}>{tab}</Text>
+              <Text style={[
+                styles.menuBtnText, 
+                { color: colors.textSecondary },
+                activeTab === tab && styles.menuBtnTextActive
+              ]}>{tab}</Text>
               {activeTab === tab && <Text style={styles.menuBtnArrow}>→</Text>}
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Right Content Area */}
-        <ScrollView style={styles.settingsContent}>
+        <ScrollView style={[styles.settingsContent, { backgroundColor: colors.cardBg }]}>
           
           {activeTab === 'Account' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Profile Information</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Profile Information</Text>
               
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Email Address</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Email Address</Text>
                 <TextInput 
-                  style={[styles.input, styles.inputDisabled]} 
+                  style={[
+                    styles.input, 
+                    styles.inputDisabled,
+                    { 
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8f8f8',
+                      borderColor: colors.border,
+                      color: colors.textMuted 
+                    }
+                  ]} 
                   value={email} 
                   editable={false} 
                 />
-                <Text style={styles.hint}>Email is linked to your authentication provider.</Text>
+                <Text style={[styles.hint, { color: colors.textMuted }]}>Email is linked to your authentication provider.</Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Creator Name</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Creator Name</Text>
                 <TextInput 
-                  style={styles.input} 
+                  style={[
+                    styles.input, 
+                    { 
+                      backgroundColor: colors.inputBg, 
+                      borderColor: colors.border, 
+                      color: colors.textPrimary 
+                    }
+                  ]} 
                   placeholder="e.g. Alex Tech" 
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Bio</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Bio</Text>
                 <TextInput 
-                  style={[styles.input, { height: 100, paddingTop: 16 }]} 
+                  style={[
+                    styles.input, 
+                    { 
+                      height: 100, 
+                      paddingTop: 16,
+                      backgroundColor: colors.inputBg,
+                      borderColor: colors.border,
+                      color: colors.textPrimary
+                    }
+                  ]} 
                   placeholder="Tell your community a bit about yourself..." 
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textMuted}
                   multiline
                 />
               </View>
 
-              <TouchableOpacity style={styles.saveBtn}>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]}>
                 <Text style={styles.saveBtnText}>Save Changes</Text>
               </TouchableOpacity>
               
-              <View style={styles.dangerZone}>
+              <View style={[styles.dangerZone, { borderTopColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#ffe5e5' }]}>
                 <Text style={styles.dangerTitle}>Danger Zone</Text>
-                <TouchableOpacity style={styles.deleteBtn}>
+                <TouchableOpacity style={[styles.deleteBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fff' }]}>
                   <Text style={styles.deleteBtnText}>Delete Account</Text>
                 </TouchableOpacity>
               </View>
@@ -95,30 +128,30 @@ export default function SettingsScreen() {
 
           {activeTab === 'Notifications' && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Notification Preferences</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notification Preferences</Text>
               
-              <View style={styles.toggleRow}>
+              <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.toggleTitle}>New Comments</Text>
-                  <Text style={styles.toggleDesc}>Get notified when you receive a new comment on any platform.</Text>
+                  <Text style={[styles.toggleTitle, { color: colors.textPrimary }]}>New Comments</Text>
+                  <Text style={[styles.toggleDesc, { color: colors.textSecondary }]}>Get notified when you receive a new comment on any platform.</Text>
                 </View>
-                <Switch value={notifyComments} onValueChange={setNotifyComments} trackColor={{ true: '#9d50ff', false: '#eee' }} />
+                <Switch value={notifyComments} onValueChange={setNotifyComments} trackColor={{ true: colors.accent, false: isDark ? '#334155' : '#eee' }} />
               </View>
 
-              <View style={styles.toggleRow}>
+              <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.toggleTitle}>Milestones & Growth</Text>
-                  <Text style={styles.toggleDesc}>Weekly reports on your audience growth and engagement.</Text>
+                  <Text style={[styles.toggleTitle, { color: colors.textPrimary }]}>Milestones & Growth</Text>
+                  <Text style={[styles.toggleDesc, { color: colors.textSecondary }]}>Weekly reports on your audience growth and engagement.</Text>
                 </View>
-                <Switch value={notifyMilestones} onValueChange={setNotifyMilestones} trackColor={{ true: '#9d50ff', false: '#eee' }} />
+                <Switch value={notifyMilestones} onValueChange={setNotifyMilestones} trackColor={{ true: colors.accent, false: isDark ? '#334155' : '#eee' }} />
               </View>
 
-              <View style={styles.toggleRow}>
+              <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.toggleTitle}>StreamSync Newsletter</Text>
-                  <Text style={styles.toggleDesc}>Product updates, tips, and creator news.</Text>
+                  <Text style={[styles.toggleTitle, { color: colors.textPrimary }]}>StreamSync Newsletter</Text>
+                  <Text style={[styles.toggleDesc, { color: colors.textSecondary }]}>Product updates, tips, and creator news.</Text>
                 </View>
-                <Switch value={notifyNewsletter} onValueChange={setNotifyNewsletter} trackColor={{ true: '#9d50ff', false: '#eee' }} />
+                <Switch value={notifyNewsletter} onValueChange={setNotifyNewsletter} trackColor={{ true: colors.accent, false: isDark ? '#334155' : '#eee' }} />
               </View>
             </View>
           )}
@@ -127,9 +160,9 @@ export default function SettingsScreen() {
             <View style={styles.section}>
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>🔗</Text>
-                <Text style={styles.emptyTitle}>Manage Connected Platforms</Text>
-                <Text style={styles.emptySub}>Add, remove, or re-authenticate your social media accounts.</Text>
-                <TouchableOpacity style={styles.saveBtn} onPress={() => router.push('/dashboard/platforms')}>
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Manage Connected Platforms</Text>
+                <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Add, remove, or re-authenticate your social media accounts.</Text>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={() => router.push('/dashboard/platforms')}>
                   <Text style={styles.saveBtnText}>Go to Platforms</Text>
                 </TouchableOpacity>
               </View>
@@ -138,14 +171,14 @@ export default function SettingsScreen() {
 
           {activeTab === 'Billing' && (
             <View style={styles.section}>
-              <View style={styles.planCard}>
+              <View style={[styles.planCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 <View style={styles.planHeader}>
-                  <Text style={styles.planName}>Creator Pro</Text>
-                  <Text style={styles.planPrice}>$29<Text style={styles.planPriceMonth}>/mo</Text></Text>
+                  <Text style={[styles.planName, { color: colors.textPrimary }]}>Creator Pro</Text>
+                  <Text style={[styles.planPrice, { color: colors.textPrimary }]}>$29<Text style={[styles.planPriceMonth, { color: colors.textMuted }]}>/mo</Text></Text>
                 </View>
-                <Text style={styles.planDesc}>You are currently on the Pro plan. Your next billing date is Nov 12, 2026.</Text>
-                <TouchableOpacity style={styles.manageBillingBtn}>
-                  <Text style={styles.manageBillingText}>Manage Subscription</Text>
+                <Text style={[styles.planDesc, { color: colors.textSecondary }]}>You are currently on the Pro plan. Your next billing date is Nov 12, 2026.</Text>
+                <TouchableOpacity style={[styles.manageBillingBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                  <Text style={[styles.manageBillingText, { color: colors.textPrimary }]}>Manage Subscription</Text>
                 </TouchableOpacity>
               </View>
             </View>

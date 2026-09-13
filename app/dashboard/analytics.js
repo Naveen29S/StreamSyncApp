@@ -5,6 +5,7 @@ import { fetchPlatformData, syncPlatformData, normalizePlatformKey } from '../..
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import ConnectModal from '../../components/ConnectModal';
+import { useTheme } from '../../context/ThemeContext';
 
 function formatCompactNumber(num) {
   if (num === null || num === undefined || isNaN(num)) return '0';
@@ -21,6 +22,7 @@ function formatCompactNumber(num) {
 }
 
 export default function AnalyticsScreen() {
+  const { colors, isDark } = useTheme();
   const [timeframe, setTimeframe] = useState('7D');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,9 +125,9 @@ export default function AnalyticsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#9d50ff" />
-        <Text style={{ marginTop: 16, color: '#666' }}>Crunching the numbers...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bodyBg }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={{ marginTop: 16, color: colors.textSecondary }}>Crunching the numbers...</Text>
       </View>
     );
   }
@@ -140,17 +142,17 @@ export default function AnalyticsScreen() {
 
   if (!hasAnalyticsData) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
-        <Feather name="bar-chart-2" size={64} color="#ccc" style={{ marginBottom: 24 }} />
-        <Text style={styles.pageTitle}>No Data Available</Text>
-        <Text style={[styles.pageSubtitle, { textAlign: 'center', marginBottom: 32, maxWidth: 400 }]}>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: colors.bodyBg }]}>
+        <Feather name="bar-chart-2" size={64} color={colors.textSecondary} style={{ marginBottom: 24, opacity: 0.5 }} />
+        <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>No Data Available</Text>
+        <Text style={[styles.pageSubtitle, { textAlign: 'center', marginBottom: 32, maxWidth: 400, color: colors.textSecondary }]}>
           Connect at least one platform (like YouTube or Instagram) to start seeing deep analytics, audience demographics, and growth trends.
         </Text>
         <TouchableOpacity 
-          style={{ backgroundColor: '#000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+          style={{ backgroundColor: colors.btnPrimaryBg, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
           onPress={() => setConnectModalVisible(true)}
         >
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Connect Platforms →</Text>
+          <Text style={{ color: colors.btnPrimaryText, fontWeight: '600', fontSize: 16 }}>Connect Platforms →</Text>
         </TouchableOpacity>
 
         <ConnectModal
@@ -166,56 +168,56 @@ export default function AnalyticsScreen() {
     'YouTube': '#FF0000',
     'Twitch': '#9146FF',
     'Instagram': '#E1306C',
-    'X (Twitter)': '#000000',
+    'X (Twitter)': isDark ? '#ffffff' : '#000000',
     'Facebook': '#1877F2',
     'LinkedIn': '#0A66C2'
   };
   
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.bodyBg }]} contentContainerStyle={styles.scrollContent}>
       
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.pageTitle}>Analytics</Text>
-          <Text style={styles.pageSubtitle}>Deep dive into your performance metrics</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Analytics</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>Deep dive into your performance metrics</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={styles.timeframeToggle}>
+          <View style={[styles.timeframeToggle, { backgroundColor: colors.badgeBg }]}>
             {['7D', '30D', '90D', 'YTD'].map(t => (
               <TouchableOpacity 
                 key={t} 
-                style={[styles.timeBtn, timeframe === t && styles.timeBtnActive]}
+                style={[styles.timeBtn, timeframe === t && [styles.timeBtnActive, { backgroundColor: colors.cardBg }]]}
                 onPress={() => setTimeframe(t)}
               >
-                <Text style={[styles.timeBtnText, timeframe === t && styles.timeBtnTextActive]}>{t}</Text>
+                <Text style={[styles.timeBtnText, { color: colors.textSecondary }, timeframe === t && [styles.timeBtnTextActive, { color: colors.textPrimary }]]}>{t}</Text>
               </TouchableOpacity>
             ))}
           </View>
           <TouchableOpacity 
-            style={{ backgroundColor: '#000', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+            style={{ backgroundColor: colors.btnPrimaryBg, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
             onPress={() => setConnectModalVisible(true)}
           >
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>+ Connect</Text>
+            <Text style={{ color: colors.btnPrimaryText, fontWeight: '600', fontSize: 13 }}>+ Connect</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Top Metrics Row */}
       <View style={styles.topMetricsRow}>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>TOTAL AUDIENCE</Text>
-          <Text style={styles.metricValue}>{formatCompactNumber(data.overview.totalFollowers)}</Text>
+        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>TOTAL AUDIENCE</Text>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{formatCompactNumber(data.overview.totalFollowers)}</Text>
           <Text style={styles.metricTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Unified Audience' : '—'}</Text>
         </View>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>ENGAGEMENT RATE</Text>
-          <Text style={styles.metricValue}>{data.overview.engagementRate || '0.0%'}</Text>
+        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ENGAGEMENT RATE</Text>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{data.overview.engagementRate || '0.0%'}</Text>
           <Text style={styles.metricTrendUp}>{parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time average' : '—'}</Text>
         </View>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>REVENUE (EST)</Text>
-          <Text style={[styles.metricValue, data.overview.estimatedRevenue < 0 && { fontSize: 24, marginTop: 4 }]}>
+        <View style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>REVENUE (EST)</Text>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }, data.overview.estimatedRevenue < 0 && { fontSize: 24, marginTop: 4 }]}>
             {data.overview.estimatedRevenue < 0 
               ? "Unmonetized" 
               : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
@@ -223,7 +225,7 @@ export default function AnalyticsScreen() {
           {data.overview.estimatedRevenue >= 0 ? (
             <Text style={styles.metricTrendUp}>↑ Estimated earnings</Text>
           ) : (
-            <Text style={[styles.metricTrendDown, { color: '#888' }]}>Grow audience to monetize</Text>
+            <Text style={[styles.metricTrendDown, { color: colors.textSecondary }]}>Grow audience to monetize</Text>
           )}
         </View>
       </View>
@@ -231,39 +233,39 @@ export default function AnalyticsScreen() {
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32, marginBottom: 32 }}>
         
         {/* Main Chart Area */}
-        <View style={[styles.card, { flex: 2 }]}>
+        <View style={[styles.card, { flex: 2, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Audience Growth</Text>
-            <Text style={styles.cardSubtitle}>Across all connected platforms</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Audience Growth</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Across all connected platforms</Text>
           </View>
           
           <View style={styles.chartWrap}>
             {data.chartData.length > 0 ? (
               data.chartData.map((d, i) => (
                 <View key={i} style={styles.barCol}>
-                  <View style={[styles.bar, { height: `${d.val}%` }]} />
-                  <Text style={styles.barLabel}>{d.day}</Text>
+                  <View style={[styles.bar, { height: `${d.val}%`, backgroundColor: colors.accent }]} />
+                  <Text style={[styles.barLabel, { color: colors.textSecondary }]}>{d.day}</Text>
                 </View>
               ))
             ) : (
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: '#999', fontSize: 13, marginBottom: 20 }}>Gathering historical data...</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 20 }}>Gathering historical data...</Text>
               </View>
             )}
           </View>
         </View>
 
         {/* Demographics Area */}
-        <View style={[styles.card, { flex: 1 }]}>
+        <View style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Demographics</Text>
-            <Text style={styles.cardSubtitle}>Combined audience data</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Demographics</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Combined audience data</Text>
           </View>
           
           {data.demographics ? (
             <View>
               {/* Gender */}
-              <Text style={styles.demoLabel}>Gender</Text>
+              <Text style={[styles.demoLabel, { color: colors.textSecondary }]}>Gender</Text>
               <View style={styles.demoBarContainer}>
                 {data.demographics.gender.map(g => (
                   <View key={g.type} style={[styles.demoSegment, { width: `${g.pct}%`, backgroundColor: g.type === 'Male' ? '#3b82f6' : '#ec4899' }]} />
@@ -271,28 +273,28 @@ export default function AnalyticsScreen() {
               </View>
               <View style={styles.demoLegend}>
                 {data.demographics.gender.map(g => (
-                  <Text key={g.type} style={styles.demoLegendText}>
+                  <Text key={g.type} style={[styles.demoLegendText, { color: colors.textPrimary }]}>
                     <Text style={{color: g.type === 'Male' ? '#3b82f6' : '#ec4899'}}>● </Text>{g.type} {g.pct}%
                   </Text>
                 ))}
               </View>
 
               {/* Age */}
-              <Text style={[styles.demoLabel, { marginTop: 24 }]}>Age Range</Text>
+              <Text style={[styles.demoLabel, { marginTop: 24, color: colors.textSecondary }]}>Age Range</Text>
               {data.demographics.age.map(a => (
                 <View key={a.range} style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 13, color: '#444' }}>{a.range}</Text>
-                    <Text style={{ fontSize: 13, color: '#888', fontFamily: mono }}>{a.pct}%</Text>
+                    <Text style={{ fontSize: 13, color: colors.textPrimary }}>{a.range}</Text>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: mono }}>{a.pct}%</Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', width: `${a.pct}%`, backgroundColor: '#9d50ff' }} />
+                  <View style={{ height: 6, backgroundColor: colors.badgeBg, borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ height: '100%', width: `${a.pct}%`, backgroundColor: colors.accent }} />
                   </View>
                 </View>
               ))}
             </View>
           ) : (
-             <Text style={{ color: '#888', fontSize: 14 }}>Demographics will unlock as platform data grows.</Text>
+             <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Demographics will unlock as platform data grows.</Text>
           )}
         </View>
       </View>
@@ -300,38 +302,38 @@ export default function AnalyticsScreen() {
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32 }}>
         
         {/* Top Content */}
-        <View style={[styles.card, { flex: 1.5 }]}>
+        <View style={[styles.card, { flex: 1.5, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Top Performing Content</Text>
-            <Text style={styles.cardSubtitle}>Based on highest engagement</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Top Performing Content</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Based on highest engagement</Text>
           </View>
           
           <View style={styles.contentList}>
             {data.topContent.length === 0 ? (
               <View style={{ padding: 24, alignItems: 'center' }}>
-                <Text style={{ color: '#888', fontSize: 13 }}>No content synced yet. Connect YouTube in Platforms.</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No content synced yet. Connect YouTube in Platforms.</Text>
               </View>
             ) : (
               data.topContent.map(item => (
-                <View key={item.id} style={styles.contentItem}>
+                <View key={item.id} style={[styles.contentItem, { borderBottomColor: colors.border }]}>
                   {item.thumbnail ? (
                     <Image source={{ uri: item.thumbnail }} style={styles.contentThumb} />
                   ) : (
-                    <View style={[styles.contentThumb, { justifyContent: 'center', alignItems: 'center' }]}>
-                      <Text style={{ fontSize: 18 }}>▶</Text>
+                    <View style={[styles.contentThumb, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.badgeBg }]}>
+                      <Text style={{ fontSize: 18, color: colors.textPrimary }}>▶</Text>
                     </View>
                   )}
                   <View style={styles.contentInfo}>
-                    <Text style={styles.contentTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.contentPlatform}>{item.platform}</Text>
+                    <Text style={[styles.contentTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+                    <Text style={[styles.contentPlatform, { color: colors.textSecondary }]}>{item.platform}</Text>
                   </View>
                   <View style={styles.contentStats}>
-                    <Text style={styles.contentStatMain}>{item.views}</Text>
-                    <Text style={styles.contentStatSub}>Views</Text>
+                    <Text style={[styles.contentStatMain, { color: colors.textPrimary }]}>{item.views}</Text>
+                    <Text style={[styles.contentStatSub, { color: colors.textSecondary }]}>Views</Text>
                   </View>
                   <View style={styles.contentStats}>
                     <Text style={[styles.contentStatMain, { color: '#10b981' }]}>{item.engage}</Text>
-                    <Text style={styles.contentStatSub}>Engage</Text>
+                    <Text style={[styles.contentStatSub, { color: colors.textSecondary }]}>Engage</Text>
                   </View>
                 </View>
               ))
@@ -340,25 +342,25 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* Platform Breakdown */}
-        <View style={[styles.card, { flex: 1 }]}>
-          <Text style={styles.cardTitle}>Platform Breakdown</Text>
+        <View style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Platform Breakdown</Text>
           
           <View style={styles.table}>
-            <View style={styles.tableHeaderRow}>
-              <Text style={[styles.tableCell, { flex: 1.5 }]}>Platform</Text>
-              <Text style={styles.tableCell}>Views</Text>
-              <Text style={styles.tableCell}>Followers</Text>
-              <Text style={styles.tableCell}>Engage</Text>
+            <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.tableCell, { flex: 1.5, color: colors.textSecondary }]}>Platform</Text>
+              <Text style={[styles.tableCell, { color: colors.textSecondary }]}>Views</Text>
+              <Text style={[styles.tableCell, { color: colors.textSecondary }]}>Followers</Text>
+              <Text style={[styles.tableCell, { color: colors.textSecondary }]}>Engage</Text>
             </View>
             
             {Object.entries(data.platformStats).map(([platform, stats], i) => (
-              <View key={platform} style={styles.tableRow}>
+              <View key={platform} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                 <View style={[styles.tableCell, { flex: 1.5, flexDirection: 'row', alignItems: 'center' }]}>
-                  <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[platform] || '#000' }]} />
-                  <Text style={styles.platformName}>{platform}</Text>
+                  <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[platform] || colors.textPrimary }]} />
+                  <Text style={[styles.platformName, { color: colors.textPrimary }]}>{platform}</Text>
                 </View>
-                <Text style={[styles.tableCell, styles.cellValue]}>{stats.views}</Text>
-                <Text style={[styles.tableCell, styles.cellValue]}>{stats.followers}</Text>
+                <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.views}</Text>
+                <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.followers}</Text>
                 <Text style={[styles.tableCell, styles.cellValue, { color: '#10b981' }]}>{stats.engage}</Text>
               </View>
             ))}

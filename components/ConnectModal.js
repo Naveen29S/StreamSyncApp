@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Platform, Image, TouchableOpacity, 
 import { supabase } from '../lib/supabase';
 import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, connectYouTubeViaApiKey, connectTwitchViaApiKey, connectXViaApiKey, disconnectPlatform } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../context/ThemeContext';
 
 const PLATFORMS = {
   YouTube:    { id: 'yt', color: '#FF0000', bg: 'rgba(255,0,0,0.08)',    logo: 'https://img.icons8.com/color/512/youtube-play.png' },
@@ -14,6 +15,7 @@ const PLATFORMS = {
 };
 
 export default function ConnectModal({ visible, onClose, initialPlatform = 'YouTube', onSuccess }) {
+  const { colors, isDark } = useTheme();
   const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [apiKeys, setApiKeys] = useState({});
@@ -460,20 +462,20 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1 }]}>
           
           {/* Modal Header */}
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {PLATFORMS[selectedPlatform] && (
                 <Image source={{ uri: PLATFORMS[selectedPlatform].logo }} style={{ width: 24, height: 24 }} resizeMode="contain" />
               )}
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
                 {selectedPlatform} Connection
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-              <Text style={{ fontSize: 16, color: '#666', fontWeight: 'bold' }}>✕</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.modalCloseBtn, { backgroundColor: colors.badgeBg }]}>
+              <Text style={{ fontSize: 16, color: colors.textSecondary, fontWeight: 'bold' }}>✕</Text>
             </TouchableOpacity>
           </View>
 
@@ -486,7 +488,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                 return (
                   <TouchableOpacity
                     key={pName}
-                    style={[styles.platformPickerChip, isActive && styles.platformPickerChipActive]}
+                    style={[
+                      styles.platformPickerChip, 
+                      { backgroundColor: colors.badgeBg, borderColor: colors.border },
+                      isActive && { backgroundColor: isDark ? colors.accent : '#000', borderColor: isDark ? colors.accent : '#000' }
+                    ]}
                     onPress={() => {
                       setSelectedPlatform(pName);
                       setModalError('');
@@ -495,8 +501,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       setYtModalSuccess('');
                     }}
                   >
-                    <Image source={{ uri: pConfig.logo }} style={{ width: 14, height: 14 }} resizeMode="contain" />
-                    <Text style={[styles.platformPickerChipText, isActive && styles.platformPickerChipTextActive]}>
+                    <Image source={{ uri: pConfig.logo }} style={[{ width: 14, height: 14 }, (pConfig.id === 'x' && isDark && !isActive) ? { tintColor: '#ffffff' } : null]} resizeMode="contain" />
+                    <Text style={[
+                      styles.platformPickerChipText, 
+                      { color: colors.textSecondary },
+                      isActive && { color: '#ffffff' }
+                    ]}>
                       {pName}
                     </Text>
                   </TouchableOpacity>
@@ -509,24 +519,24 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
           {selectedPlatform === 'YouTube' ? (
             <View>
               {isYtConnected && (
-                <View style={styles.alreadyConnectedBox}>
+                <View style={[styles.alreadyConnectedBox, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Channel Connected & Synced</Text>
                   </View>
-                  <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
                     {apiKeys.youtube_channel_title ? `Channel: ${apiKeys.youtube_channel_title}` : 'Your YouTube channel is actively delivering data.'}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <TouchableOpacity 
-                      style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                      style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
                       onPress={handleSyncYtNow}
                       disabled={ytLoading}
                     >
-                      <Text style={styles.modalSecondaryBtnText}>{ytLoading ? 'Syncing...' : '↻ Sync Now'}</Text>
+                      <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>{ytLoading ? 'Syncing...' : '↻ Sync Now'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.modalDangerBtn, { flex: 1 }]} 
+                      style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
                       onPress={() => handleDisconnect('yt')}
                       disabled={ytLoading}
                     >
@@ -537,33 +547,33 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
               )}
 
               {/* Subtabs for YouTube: OAuth / API Key */}
-              <View style={styles.modalTabs}>
+              <View style={[styles.modalTabs, { backgroundColor: colors.badgeBg }]}>
                 <TouchableOpacity 
-                  style={[styles.modalTabBtn, ytTab === 'oauth' && styles.modalTabBtnActive]}
+                  style={[styles.modalTabBtn, ytTab === 'oauth' && [styles.modalTabBtnActive, { backgroundColor: colors.cardBg }]]}
                   onPress={() => setYtTab('oauth')}
                 >
-                  <Text style={[styles.modalTabText, ytTab === 'oauth' && styles.modalTabTextActive]}>Google OAuth (Recommended)</Text>
+                  <Text style={[styles.modalTabText, { color: colors.textSecondary }, ytTab === 'oauth' && [styles.modalTabTextActive, { color: colors.textPrimary }]]}>Google OAuth (Recommended)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.modalTabBtn, ytTab === 'apikey' && styles.modalTabBtnActive]}
+                  style={[styles.modalTabBtn, ytTab === 'apikey' && [styles.modalTabBtnActive, { backgroundColor: colors.cardBg }]]}
                   onPress={() => setYtTab('apikey')}
                 >
-                  <Text style={[styles.modalTabText, ytTab === 'apikey' && styles.modalTabTextActive]}>YouTube API Key</Text>
+                  <Text style={[styles.modalTabText, { color: colors.textSecondary }, ytTab === 'apikey' && [styles.modalTabTextActive, { color: colors.textPrimary }]]}>YouTube API Key</Text>
                 </TouchableOpacity>
               </View>
 
               {ytTab === 'apikey' ? (
                 <View style={styles.tabBody}>
-                  <Text style={styles.modalDesc}>
+                  <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
                     Enter your YouTube Data API v3 Key and channel Handle or ID to sync subscriber count, views, and videos.
                   </Text>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>YOUTUBE DATA API KEY *</Text>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUTUBE DATA API KEY *</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                       placeholder="e.g. AIzaSy..."
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={ytApiKey}
                       onChangeText={setYtApiKey}
                       autoCapitalize="none"
@@ -572,11 +582,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>CHANNEL HANDLE OR ID *</Text>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CHANNEL HANDLE OR ID *</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                       placeholder="e.g. @mkbhd, @GoogleDevelopers, or UC..."
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={ytChannelId}
                       onChangeText={setYtChannelId}
                       autoCapitalize="none"
@@ -597,14 +607,14 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   ) : null}
 
                   <TouchableOpacity 
-                    style={[styles.modalPrimaryBtn, ytLoading && { opacity: 0.7 }]}
+                    style={[styles.modalPrimaryBtn, { backgroundColor: colors.btnPrimaryBg }, ytLoading && { opacity: 0.7 }]}
                     onPress={() => handleApiKeyConnect()}
                     disabled={ytLoading}
                   >
                     {ytLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={colors.btnPrimaryText} />
                     ) : (
-                      <Text style={styles.modalPrimaryBtnText}>Connect & Fetch Channel Data</Text>
+                      <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect & Fetch Channel Data</Text>
                     )}
                   </TouchableOpacity>
 
@@ -613,12 +623,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     onPress={handleQuickDemoConnect}
                     disabled={ytLoading}
                   >
-                    <Text style={styles.quickSampleText}>⚡ Quick Connect Sample Channel (@GoogleDevelopers)</Text>
+                    <Text style={[styles.quickSampleText, { color: colors.accent }]}>⚡ Quick Connect Sample Channel (@GoogleDevelopers)</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.tabBody}>
-                  <Text style={styles.modalDesc}>
+                  <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
                     Sign in with your Google account to authorize StreamSync to read your YouTube channel statistics and uploaded videos directly.
                   </Text>
 
@@ -629,12 +639,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   ) : null}
 
                   <TouchableOpacity 
-                    style={styles.googleOAuthBtn}
+                    style={[styles.googleOAuthBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
                     onPress={() => handleOAuthConnect('yt')}
                     disabled={actionLoading}
                   >
                     <Image source={{ uri: 'https://img.icons8.com/color/512/google-logo.png' }} style={{ width: 20, height: 20, marginRight: 10 }} />
-                    <Text style={styles.googleOAuthBtnText}>
+                    <Text style={[styles.googleOAuthBtnText, { color: colors.textPrimary }]}>
                       {actionLoading ? 'Connecting to Google...' : 'Continue with Google'}
                     </Text>
                   </TouchableOpacity>
@@ -648,26 +658,26 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
               return (
                 <View style={styles.tabBody}>
                   {isTwitchConn && (
-                    <View style={styles.alreadyConnectedBox}>
+                    <View style={[styles.alreadyConnectedBox, isDark && { backgroundColor: 'rgba(145, 70, 255, 0.1)', borderColor: 'rgba(145, 70, 255, 0.3)' }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#9146FF' }} />
                         <Text style={{ fontSize: 13, fontWeight: '700', color: '#9146FF' }}>Twitch Connected & Synced</Text>
                       </View>
-                      <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
                         {apiKeys.twitch_channel_title || apiKeys.twitch_username ? `Channel: ${apiKeys.twitch_channel_title || apiKeys.twitch_username}` : 'Your Twitch channel is actively connected.'}
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                         <TouchableOpacity 
-                          style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                          style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
                           onPress={handleSyncTwitchNow}
                           disabled={twitchLoading}
                         >
-                          <Text style={styles.modalSecondaryBtnText}>
+                          <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>
                             {twitchLoading ? 'Syncing...' : '↻ Sync Now'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
-                          style={[styles.modalDangerBtn, { flex: 1 }]} 
+                          style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
                           onPress={() => handleDisconnect('twitch')}
                           disabled={twitchLoading}
                         >
@@ -677,16 +687,16 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
                   )}
 
-                  <Text style={styles.modalDesc}>
+                  <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
                     Connect your Twitch channel to sync live stream viewers, total followers, game categories, and top broadcast clips in real time.
                   </Text>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>TWITCH CHANNEL USERNAME *</Text>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>TWITCH CHANNEL USERNAME *</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                       placeholder="e.g. shroud, ninja, or your channel"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={twitchUsername}
                       onChangeText={setTwitchUsername}
                       autoCapitalize="none"
@@ -695,11 +705,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>TWITCH CLIENT ID</Text>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>TWITCH CLIENT ID</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                       placeholder="e.g. gp762nuuoqcoxypju8c569th9wz7q5"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={twitchClientId}
                       onChangeText={setTwitchClientId}
                       autoCapitalize="none"
@@ -708,11 +718,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>TWITCH CLIENT SECRET</Text>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>TWITCH CLIENT SECRET</Text>
                     <TextInput
-                      style={styles.modalInput}
+                      style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
                       placeholder="e.g. ••••••••••••••••••••••••••••••••"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={twitchClientSecret}
                       onChangeText={setTwitchClientSecret}
                       secureTextEntry={true}
@@ -755,7 +765,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#9146FF' }]} 
+                    style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#9146FF', backgroundColor: colors.cardBg }]} 
                     onPress={handleQuickDemoTwitchConnect}
                     disabled={twitchLoading}
                   >
@@ -772,26 +782,26 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
               return (
                 <View style={styles.tabBody}>
                   {isConn && (
-                    <View style={[styles.alreadyConnectedBox, { marginBottom: 16 }]}>
+                    <View style={[styles.alreadyConnectedBox, { marginBottom: 16 }, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
                         <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>X Account Connected & Synced</Text>
                       </View>
-                      <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
                         Connected as @{xUsername || 'user'}. Analytics, impressions, and tweets are actively synced with your dashboard.
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                         <TouchableOpacity 
-                          style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                          style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
                           onPress={handleSyncXNow}
                           disabled={xLoading}
                         >
-                          <Text style={styles.modalSecondaryBtnText}>
+                          <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>
                             {xLoading ? 'Syncing...' : '↻ Sync Now'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
-                          style={[styles.modalDangerBtn, { flex: 1 }]} 
+                          style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
                           onPress={() => handleDisconnect('x')}
                           disabled={xLoading}
                         >
@@ -801,100 +811,110 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
                   )}
 
-                  <Text style={styles.modalDesc}>
+                  <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
                     Connect your X (Twitter) account to sync tweet impressions, followers count, engagement rate, and recent posts directly into your StreamSync dashboard.
                   </Text>
 
                   {/* 1-Click OAuth 2.0 (No API key needed) */}
                   <TouchableOpacity 
-                    style={[styles.googleOAuthBtn, { backgroundColor: '#000000', borderColor: '#000000', marginTop: 4, marginBottom: 12 }]} 
+                    style={[
+                      styles.googleOAuthBtn, 
+                      { 
+                        backgroundColor: isDark ? '#ffffff' : '#000000', 
+                        borderColor: isDark ? '#ffffff' : '#000000', 
+                        marginTop: 4, 
+                        marginBottom: 12 
+                      }
+                    ]} 
                     onPress={() => handleOAuthConnect('x')}
                     disabled={actionLoading}
                   >
                     <Image 
                       source={{ uri: PLATFORMS['X (Twitter)'].logo }} 
-                      style={{ width: 18, height: 18, marginRight: 10, tintColor: '#ffffff' }} 
+                      style={{ width: 18, height: 18, marginRight: 10, tintColor: isDark ? '#000000' : '#ffffff' }} 
                     />
-                    <Text style={[styles.googleOAuthBtnText, { color: '#ffffff' }]}>
+                    <Text style={[styles.googleOAuthBtnText, { color: isDark ? '#000000' : '#ffffff' }]}>
                       {actionLoading ? "Connecting with X..." : "Continue with X (1-Click OAuth 2.0)"}
                     </Text>
                   </TouchableOpacity>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
-                    <View style={{ flex: 1, height: 1, backgroundColor: '#e5e5e5' }} />
-                    <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 0.5 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                    <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
                       OR QUICK DEMO / MANUAL API KEY
                     </Text>
-                    <View style={{ flex: 1, height: 1, backgroundColor: '#e5e5e5' }} />
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                   </View>
 
-                  <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>X (TWITTER) USERNAME / HANDLE *</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="e.g. TwitterDev, elonmusk, or your handle"
-                      placeholderTextColor="#999"
-                      value={xUsername}
-                      onChangeText={setXUsername}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-
-                  <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>X API BEARER TOKEN (OPTIONAL FOR QUICK DEMO)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="e.g. AAAAAAAAAAAAAAAAAAAAA... (or DEMO)"
-                      placeholderTextColor="#999"
-                      value={xBearerToken}
-                      onChangeText={setXBearerToken}
-                      secureTextEntry={true}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-
-                  <TouchableOpacity 
-                    onPress={() => Linking.openURL('https://developer.x.com/en/portal/dashboard')}
-                    style={{ marginBottom: 12 }}
-                  >
-                    <Text style={{ fontSize: 12, color: '#000000', fontWeight: '600' }}>
-                      Get your Bearer Token at developer.x.com ↗ (or click Quick Demo below)
-                    </Text>
-                  </TouchableOpacity>
-
-                  {xModalError ? (
-                    <View style={styles.errorBanner}>
-                      <Text style={styles.errorBannerText}>{xModalError}</Text>
+                  <View style={styles.tabBody}>
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X (TWITTER) USERNAME / HANDLE *</Text>
+                      <TextInput
+                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                        placeholder="e.g. TwitterDev, elonmusk, or your handle"
+                        placeholderTextColor={colors.textSecondary}
+                        value={xUsername}
+                        onChangeText={setXUsername}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
                     </View>
-                  ) : null}
 
-                  {xModalSuccess ? (
-                    <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                      <Text style={[styles.errorBannerText, { color: '#166534' }]}>{xModalSuccess}</Text>
+                    <View style={styles.formGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X API BEARER TOKEN (OPTIONAL FOR QUICK DEMO)</Text>
+                      <TextInput
+                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                        placeholder="e.g. AAAAAAAAAAAAAAAAAAAAA... (or DEMO)"
+                        placeholderTextColor={colors.textSecondary}
+                        value={xBearerToken}
+                        onChangeText={setXBearerToken}
+                        secureTextEntry={true}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
                     </View>
-                  ) : null}
 
-                  <TouchableOpacity 
-                    style={[styles.modalPrimaryBtn, { backgroundColor: '#000000' }]} 
-                    onPress={() => handleXConnect()}
-                    disabled={xLoading}
-                  >
-                    {xLoading ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.modalPrimaryBtnText}>Connect X Account</Text>
-                    )}
-                  </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => Linking.openURL('https://developer.x.com/en/portal/dashboard')}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Text style={{ fontSize: 12, color: colors.accent, fontWeight: '600' }}>
+                        Get your Bearer Token at developer.x.com ↗ (or click Quick Demo below)
+                      </Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: '#000000' }]} 
-                    onPress={handleQuickDemoXConnect}
-                    disabled={xLoading}
-                  >
-                    <Text style={[styles.modalSecondaryBtnText, { color: '#000000' }]}>⚡ Quick Demo: Test with @TwitterDev</Text>
-                  </TouchableOpacity>
+                    {xModalError ? (
+                      <View style={styles.errorBanner}>
+                        <Text style={styles.errorBannerText}>{xModalError}</Text>
+                      </View>
+                    ) : null}
+
+                    {xModalSuccess ? (
+                      <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                        <Text style={[styles.errorBannerText, { color: '#166534' }]}>{xModalSuccess}</Text>
+                      </View>
+                    ) : null}
+
+                    <TouchableOpacity 
+                      style={[styles.modalPrimaryBtn, { backgroundColor: colors.btnPrimaryBg }]} 
+                      onPress={() => handleXConnect()}
+                      disabled={xLoading}
+                    >
+                      {xLoading ? (
+                        <ActivityIndicator color={colors.btnPrimaryText} size="small" />
+                      ) : (
+                        <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect X Account</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.modalSecondaryBtn, { marginTop: 10, borderColor: colors.border, backgroundColor: colors.cardBg }]} 
+                      onPress={handleQuickDemoXConnect}
+                      disabled={xLoading}
+                    >
+                      <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>⚡ Quick Demo: Test with @TwitterDev</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })()
@@ -908,26 +928,26 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
               return (
                 <View style={styles.tabBody}>
                   {isConn ? (
-                    <View style={styles.alreadyConnectedBox}>
+                    <View style={[styles.alreadyConnectedBox, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Account Connected & Synced</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>Account Connected & Active</Text>
                       </View>
-                      <Text style={{ fontSize: 13, color: '#444', marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
                         Your {selectedPlatform} account is linked to your StreamSync profile.
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                         <TouchableOpacity 
-                          style={[styles.modalSecondaryBtn, { flex: 1 }]} 
+                          style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
                           onPress={() => handleSyncPlatform(pKey)}
                           disabled={actionLoading}
                         >
-                          <Text style={styles.modalSecondaryBtnText}>
+                          <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>
                             {actionLoading ? 'Syncing...' : '↻ Sync Now'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
-                          style={[styles.modalDangerBtn, { flex: 1 }]} 
+                          style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
                           onPress={() => handleDisconnect(pKey)}
                           disabled={actionLoading}
                         >
@@ -936,7 +956,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       </View>
                     </View>
                   ) : (
-                    <Text style={styles.modalDesc}>
+                    <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
                       Authorize StreamSync to connect with your {selectedPlatform} account to sync analytics, reach, and content.
                     </Text>
                   )}
@@ -955,14 +975,14 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
 
                   {!isConn ? (
                     <TouchableOpacity 
-                      style={[styles.modalPrimaryBtn, actionLoading && { opacity: 0.7 }]}
+                      style={[styles.modalPrimaryBtn, { backgroundColor: colors.btnPrimaryBg }, actionLoading && { opacity: 0.7 }]} 
                       onPress={() => handleOAuthConnect(pKey)}
                       disabled={actionLoading}
                     >
                       {actionLoading ? (
-                        <ActivityIndicator size="small" color="#fff" />
+                        <ActivityIndicator size="small" color={colors.btnPrimaryText} />
                       ) : (
-                        <Text style={styles.modalPrimaryBtnText}>Connect {selectedPlatform}</Text>
+                        <Text style={[styles.modalPrimaryBtnText, { color: colors.btnPrimaryText }]}>Connect {selectedPlatform}</Text>
                       )}
                     </TouchableOpacity>
                   ) : (
@@ -971,7 +991,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       onPress={() => handleOAuthConnect(pKey)}
                       disabled={actionLoading}
                     >
-                      <Text style={styles.quickSampleText}>↻ Re-authenticate / Reconnect Account</Text>
+                      <Text style={[styles.quickSampleText, { color: colors.accent }]}>↻ Re-authenticate / Reconnect Account</Text>
                     </TouchableOpacity>
                   )}
                 </View>

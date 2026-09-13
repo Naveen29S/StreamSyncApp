@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 const DAYS = [
   { day: 'Mon', date: '15', active: false },
@@ -19,6 +20,7 @@ const INITIAL_POSTS = [
 ];
 
 export default function ScheduleScreen() {
+  const { colors, isDark } = useTheme();
   const [selectedDate, setSelectedDate] = useState('17');
   const [posts, setPosts] = useState(INITIAL_POSTS);
   
@@ -54,11 +56,11 @@ export default function ScheduleScreen() {
   const currentDayPosts = posts.filter(p => p.date === selectedDate);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.pageTitle}>Schedule</Text>
-          <Text style={styles.pageSubtitle}>Plan and organize your upcoming content calendar</Text>
+          <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Schedule</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>Plan and organize your upcoming content calendar</Text>
         </View>
         <TouchableOpacity style={styles.createBtn} onPress={() => setModalVisible(true)}>
           <Text style={styles.createBtnIcon}>+</Text>
@@ -73,11 +75,15 @@ export default function ScheduleScreen() {
           return (
             <TouchableOpacity 
               key={d.date} 
-              style={[styles.dayCard, isActive && styles.dayCardActive]}
+              style={[
+                styles.dayCard, 
+                { backgroundColor: colors.cardBg, borderColor: colors.border },
+                isActive && [styles.dayCardActive, { backgroundColor: isDark ? colors.accent : '#000', borderColor: isDark ? colors.accent : '#000' }]
+              ]}
               onPress={() => setSelectedDate(d.date)}
             >
-              <Text style={[styles.dayText, isActive && styles.dayTextActive]}>{d.day}</Text>
-              <Text style={[styles.dateText, isActive && styles.dateTextActive]}>{d.date}</Text>
+              <Text style={[styles.dayText, { color: colors.textMuted }, isActive && styles.dayTextActive]}>{d.day}</Text>
+              <Text style={[styles.dateText, { color: colors.textPrimary }, isActive && styles.dateTextActive]}>{d.date}</Text>
               {d.date === '17' && <View style={styles.hasContentDot} />}
             </TouchableOpacity>
           );
@@ -90,18 +96,18 @@ export default function ScheduleScreen() {
             <View key={post.id} style={styles.timelineItem}>
               
               <View style={styles.timeCol}>
-                <Text style={styles.timeText}>{post.time}</Text>
-                {index !== currentDayPosts.length - 1 && <View style={styles.timeLine} />}
+                <Text style={[styles.timeText, { color: colors.textMuted }]}>{post.time}</Text>
+                {index !== currentDayPosts.length - 1 && <View style={[styles.timeLine, { backgroundColor: colors.border }]} />}
               </View>
 
-              <View style={styles.postCard}>
+              <View style={[styles.postCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                 <View style={[styles.cardAccent, { backgroundColor: post.color }]} />
                 <View style={styles.cardContent}>
                   <Text style={[styles.postPlatform, { color: post.color, fontWeight: '700', fontSize: 11, marginBottom: 4 }]}>{post.platform}</Text>
-                  <Text style={styles.postTitle}>{post.title}</Text>
+                  <Text style={[styles.postTitle, { color: colors.textPrimary }]}>{post.title}</Text>
                 </View>
-                <TouchableOpacity style={styles.editBtn}>
-                  <Text style={styles.editBtnText}>Edit</Text>
+                <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.badgeBg }]}>
+                  <Text style={[styles.editBtnText, { color: colors.textPrimary }]}>Edit</Text>
                 </TouchableOpacity>
               </View>
 
@@ -110,8 +116,8 @@ export default function ScheduleScreen() {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>No posts scheduled</Text>
-            <Text style={styles.emptySub}>Take the day off, or schedule a new post!</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No posts scheduled</Text>
+            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Take the day off, or schedule a new post!</Text>
           </View>
         )}
       </ScrollView>
@@ -119,33 +125,41 @@ export default function ScheduleScreen() {
       {/* Modal for Scheduling a New Post */}
       {modalVisible && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Schedule New Post</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
-                <Text style={styles.closeBtnText}>✕</Text>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Schedule New Post</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.closeBtn, { backgroundColor: colors.badgeBg }]}>
+                <Text style={[styles.closeBtnText, { color: colors.textPrimary }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.label}>Select Platform</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Select Platform</Text>
               <View style={styles.platformSelector}>
                 {['YouTube', 'Twitch', 'Instagram', 'X (Twitter)', 'LinkedIn', 'Facebook'].map(p => (
                   <TouchableOpacity 
                     key={p} 
-                    style={[styles.platformChip, newPostPlatform === p && styles.platformChipActive]}
+                    style={[
+                      styles.platformChip, 
+                      { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      newPostPlatform === p && [styles.platformChipActive, { backgroundColor: isDark ? colors.accent : '#000', borderColor: isDark ? colors.accent : '#000' }]
+                    ]}
                     onPress={() => setNewPostPlatform(p)}
                   >
-                    <Text style={[styles.platformChipText, newPostPlatform === p && styles.platformChipTextActive]}>{p}</Text>
+                    <Text style={[
+                      styles.platformChipText, 
+                      { color: colors.textSecondary },
+                      newPostPlatform === p && styles.platformChipTextActive
+                    ]}>{p}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.label}>Time (for {selectedDate})</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Time (for {selectedDate})</Text>
               <View style={{
-                  backgroundColor: '#f8f8f8',
+                  backgroundColor: colors.inputBg,
                   borderWidth: 1,
-                  borderColor: '#eee',
+                  borderColor: colors.border,
                   borderRadius: 12,
                   padding: 16,
                   height: 52,
@@ -163,16 +177,16 @@ export default function ScheduleScreen() {
                      outline: 'none',
                      fontSize: '14px',
                      fontFamily: 'inherit',
-                     color: '#333'
+                     color: colors.textPrimary
                    }}
                  />
               </View>
 
-              <Text style={styles.label}>Post Content / Title</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Post Content / Title</Text>
               <View style={{
-                  backgroundColor: '#f8f8f8',
+                  backgroundColor: colors.inputBg,
                   borderWidth: 1,
-                  borderColor: '#eee',
+                  borderColor: colors.border,
                   borderRadius: 12,
                   padding: 16,
                   height: 120,
@@ -189,7 +203,8 @@ export default function ScheduleScreen() {
                      border: 'none',
                      outline: 'none',
                      fontSize: '14px',
-                     fontFamily: 'inherit'
+                     fontFamily: 'inherit',
+                     color: colors.textPrimary
                    }}
                  />
               </View>
@@ -197,7 +212,7 @@ export default function ScheduleScreen() {
 
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.submitBtn} onPress={handleScheduleSubmit}>
                 <Text style={styles.submitBtnText}>Schedule Post</Text>

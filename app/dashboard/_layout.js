@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { processSessionOAuthTokens, normalizePlatformKey, isPlatformMatch } from '../../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import ThemeToggle from '../../components/ThemeToggle';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'grid' },
@@ -143,13 +145,14 @@ export default function DashboardLayout() {
     await supabase.auth.signOut();
   };
 
+  const { colors, isDark } = useTheme();
   const userInitial = session?.user?.email?.[0]?.toUpperCase() || '?';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
       
       {/* ─── Top Navigation Bar ─── */}
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { backgroundColor: colors.topbarBg, borderBottomColor: colors.border }]}>
         <View style={styles.topbarLeft}>
           <View style={styles.brandRow}>
             <Image
@@ -158,41 +161,44 @@ export default function DashboardLayout() {
               resizeMode="contain"
             />
             <View>
-              <Text style={styles.brandName}>StreamSync</Text>
-              <Text style={styles.brandTag}>Creator Hub</Text>
+              <Text style={[styles.brandName, { color: colors.textPrimary }]}>StreamSync</Text>
+              <Text style={[styles.brandTag, { color: colors.textSecondary }]}>Creator Hub</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.topbarCenter}>
-          <View style={styles.searchContainer}>
-            <Text style={styles.searchIconText}>⌕</Text>
+          <View style={[styles.searchContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.searchIconText, { color: colors.textSecondary }]}>⌕</Text>
             <TextInput 
-              style={styles.searchInput} 
+              style={[styles.searchInput, { color: colors.textPrimary }]} 
               placeholder="Search content, analytics, comments..." 
-              placeholderTextColor="#5a6270"
+              placeholderTextColor={colors.textMuted}
             />
-            <View style={styles.searchShortcut}>
-              <Text style={styles.searchShortcutText}>⌘K</Text>
+            <View style={[styles.searchShortcut, { backgroundColor: colors.borderSubtle }]}>
+              <Text style={[styles.searchShortcutText, { color: colors.textSecondary }]}>⌘K</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.topbarRight}>
           {/* Sync Status Indicator */}
-          <View style={styles.syncStatusPill}>
-            <View style={[styles.syncDot, { backgroundColor: connectedPlatforms.length > 0 ? '#10b981' : '#9d50ff' }]} />
-            <Text style={styles.syncStatusText}>
+          <View style={[styles.syncStatusPill, { backgroundColor: colors.badgeBg, borderColor: colors.border }]}>
+            <View style={[styles.syncDot, { backgroundColor: connectedPlatforms.length > 0 ? '#10b981' : colors.accent }]} />
+            <Text style={[styles.syncStatusText, { color: colors.badgeText }]}>
               {connectedPlatforms.length > 0 ? `${connectedPlatforms.length} active` : 'Sync ready'}
             </Text>
           </View>
+
+          {/* ☀️ / 🌙 Day / Dark Mode Corner Toggle */}
+          <ThemeToggle size="small" style={{ marginHorizontal: 6 }} />
           
-          <TouchableOpacity style={styles.topIconBtn}>
+          <TouchableOpacity style={[styles.topIconBtn, { backgroundColor: colors.badgeBg }]}>
             <Text style={styles.topIconEmoji}>🔔</Text>
           </TouchableOpacity>
 
           {session && (
-            <TouchableOpacity style={styles.avatarBtn}>
+            <TouchableOpacity style={[styles.avatarBtn, { backgroundColor: colors.accent }]}>
               <Text style={styles.avatarText}>{userInitial}</Text>
             </TouchableOpacity>
           )}
@@ -203,15 +209,15 @@ export default function DashboardLayout() {
       <View style={styles.body}>
         
         {/* ─── Left Sidebar ─── */}
-        <View style={styles.sidebar}>
+        <View style={[styles.sidebar, { backgroundColor: colors.sidebarBg, borderRightColor: colors.border }]}>
           {/* Platform Sync Indicators */}
           <View style={styles.platformSyncSection}>
-            <Text style={styles.sidebarSectionLabel}>PLATFORMS</Text>
+            <Text style={[styles.sidebarSectionLabel, { color: colors.textMuted }]}>PLATFORMS</Text>
             {[
               { id: 'yt', name: 'YouTube', color: '#FF0000' },
               { id: 'twitch', name: 'Twitch', color: '#9146FF' },
               { id: 'ig', name: 'Instagram', color: '#E1306C' },
-              { id: 'x', name: 'X', color: '#000000' },
+              { id: 'x', name: 'X', color: isDark ? '#ffffff' : '#000000' },
               { id: 'fb', name: 'Facebook', color: '#1877F2' },
               { id: 'in', name: 'LinkedIn', color: '#0A66C2' },
             ].map((p) => {
@@ -220,9 +226,19 @@ export default function DashboardLayout() {
               return (
                 <View key={p.name} style={styles.platformRow}>
                   <View style={[styles.platformDot, { backgroundColor: p.color }]} />
-                  <Text style={styles.platformLabel}>{p.name}</Text>
-                  <View style={[styles.syncBadge, isSynced ? styles.syncBadgeActive : styles.syncBadgeIdle]}>
-                    <Text style={[styles.syncBadgeText, isSynced ? styles.syncBadgeTextActive : styles.syncBadgeTextIdle]}>
+                  <Text style={[styles.platformLabel, { color: colors.textSecondary }]}>{p.name}</Text>
+                  <View style={[
+                    styles.syncBadge, 
+                    isSynced 
+                      ? (isDark ? { backgroundColor: 'rgba(16, 185, 129, 0.2)' } : styles.syncBadgeActive) 
+                      : (isDark ? { backgroundColor: 'rgba(255, 255, 255, 0.05)' } : styles.syncBadgeIdle)
+                  ]}>
+                    <Text style={[
+                      styles.syncBadgeText, 
+                      isSynced 
+                        ? (isDark ? { color: '#34d399' } : styles.syncBadgeTextActive) 
+                        : (isDark ? { color: '#64748b' } : styles.syncBadgeTextIdle)
+                    ]}>
                       {isSynced ? 'Live' : 'Idle'}
                     </Text>
                   </View>
@@ -233,16 +249,23 @@ export default function DashboardLayout() {
 
           {/* Navigation */}
           <View style={styles.navSection}>
-            <Text style={styles.sidebarSectionLabel}>NAVIGATION</Text>
+            <Text style={[styles.sidebarSectionLabel, { color: colors.textMuted }]}>NAVIGATION</Text>
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
               return (
                 <Link href={item.path} key={item.id} asChild>
-                  <TouchableOpacity style={StyleSheet.flatten([styles.navItem, isActive && styles.navItemActive])}>
+                  <TouchableOpacity style={StyleSheet.flatten([
+                    styles.navItem, 
+                    isActive && [styles.navItemActive, { backgroundColor: colors.badgeBg }]
+                  ])}>
                     <View style={styles.navIconContainer}>
-                      <Feather name={item.icon} size={18} color={isActive ? '#000' : '#666'} />
+                      <Feather name={item.icon} size={18} color={isActive ? colors.textPrimary : colors.textSecondary} />
                     </View>
-                    <Text style={[styles.navLabel, isActive && styles.navItemActiveText]}>
+                    <Text style={[
+                      styles.navLabel, 
+                      { color: colors.textSecondary },
+                      isActive && [{ color: colors.textPrimary, fontWeight: '700' }]
+                    ]}>
                       {item.label}
                     </Text>
                   </TouchableOpacity>
@@ -254,11 +277,18 @@ export default function DashboardLayout() {
           {/* Bottom */}
           <View style={styles.sidebarBottom}>
             <Link href="/dashboard/settings" asChild>
-              <TouchableOpacity style={StyleSheet.flatten([styles.navItem, pathname.startsWith('/dashboard/settings') && styles.navItemActive])}>
+              <TouchableOpacity style={StyleSheet.flatten([
+                styles.navItem, 
+                pathname.startsWith('/dashboard/settings') && [styles.navItemActive, { backgroundColor: colors.badgeBg }]
+              ])}>
                 <View style={styles.navIconContainer}>
-                  <Feather name="settings" size={18} color={pathname.startsWith('/dashboard/settings') ? '#000' : '#666'} />
+                  <Feather name="settings" size={18} color={pathname.startsWith('/dashboard/settings') ? colors.textPrimary : colors.textSecondary} />
                 </View>
-                <Text style={[styles.navLabel, pathname.startsWith('/dashboard/settings') && styles.navItemActiveText]}>Settings</Text>
+                <Text style={[
+                  styles.navLabel, 
+                  { color: colors.textSecondary },
+                  pathname.startsWith('/dashboard/settings') && [{ color: colors.textPrimary, fontWeight: '700' }]
+                ]}>Settings</Text>
               </TouchableOpacity>
             </Link>
             
@@ -272,7 +302,7 @@ export default function DashboardLayout() {
         </View>
 
         {/* ─── Main Content ─── */}
-        <View style={styles.mainContent}>
+        <View style={[styles.mainContent, { backgroundColor: colors.bodyBg }]}>
           <Slot />
         </View>
       </View>

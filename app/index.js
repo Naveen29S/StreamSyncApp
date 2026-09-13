@@ -2,16 +2,20 @@ import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions, Image, Linking } from 'react-native';
 import { Link } from 'expo-router';
 import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
+import { useTheme } from '../context/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 const { width } = Dimensions.get('window');
 
 export default function App() {
+  const { colors, isDark } = useTheme();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
       
       {/* Subtle background glows */}
-      <View style={styles.glowA} pointerEvents="none" />
-      <View style={styles.glowB} pointerEvents="none" />
+      <View style={[styles.glowA, { backgroundColor: colors.glowA }]} pointerEvents="none" />
+      <View style={[styles.glowB, { backgroundColor: colors.glowB }]} pointerEvents="none" />
 
       {/* ─── Top Navigation ─── */}
       <View style={styles.navBar}>
@@ -21,26 +25,29 @@ export default function App() {
             style={styles.logoIcon}
             resizeMode="contain"
           />
-          <Text style={styles.brandName}>StreamSync</Text>
+          <Text style={[styles.brandName, { color: colors.textPrimary }]}>StreamSync</Text>
         </View>
 
         {width > 768 && (
           <View style={styles.navLinks}>
-            <Text style={styles.navLink}>Features</Text>
-            <Text style={styles.navLink}>Platforms</Text>
-            <Text style={styles.navLink}>Pricing</Text>
+            <Text style={[styles.navLink, { color: colors.textSecondary }]}>Features</Text>
+            <Text style={[styles.navLink, { color: colors.textSecondary }]}>Platforms</Text>
+            <Text style={[styles.navLink, { color: colors.textSecondary }]}>Pricing</Text>
           </View>
         )}
 
         <View style={styles.authButtons}>
+          {/* Day / Dark Mode Toggle in Top-Right Corner */}
+          <ThemeToggle size="small" style={{ marginRight: 6 }} />
+
           <Link href="/auth?mode=signin" asChild>
             <TouchableOpacity style={styles.signInButton}>
-              <Text style={styles.signInText}>Sign In</Text>
+              <Text style={[styles.signInText, { color: colors.textPrimary }]}>Sign In</Text>
             </TouchableOpacity>
           </Link>
           <Link href="/auth?mode=signup" asChild>
-            <TouchableOpacity style={styles.navButton}>
-              <Text style={styles.navButtonText}>Get Started</Text>
+            <TouchableOpacity style={[styles.navButton, { backgroundColor: colors.btnPrimaryBg }]}>
+              <Text style={[styles.navButtonText, { color: colors.btnPrimaryText }]}>Get Started</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -48,61 +55,61 @@ export default function App() {
 
       {/* ─── Hero Section ─── */}
       <Animated.View entering={FadeInDown.duration(800)} style={styles.heroSection}>
-        <View style={styles.heroPill}>
-          <View style={styles.heroPillDot} />
-          <Text style={styles.heroPillText}>Multi-platform syncing for creators</Text>
+        <View style={[styles.heroPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: colors.border }]}>
+          <View style={[styles.heroPillDot, { backgroundColor: colors.accent }]} />
+          <Text style={[styles.heroPillText, { color: colors.textPrimary }]}>Multi-platform syncing for creators</Text>
         </View>
-        <Text style={styles.heroTitle}>
+        <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
           All your platforms.{'\n'}One command center.
         </Text>
-        <Text style={styles.heroDesc}>
+        <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>
           Connect YouTube, Instagram, X, Facebook, and LinkedIn. See unified analytics, manage comments, and cross-post content — all from a single dashboard.
         </Text>
 
         <View style={styles.heroCTA}>
           <Link href="/auth?mode=signup" asChild>
-            <TouchableOpacity style={styles.heroButton}>
-              <Text style={styles.heroButtonText}>START SYNCING →</Text>
+            <TouchableOpacity style={[styles.heroButton, { backgroundColor: colors.btnPrimaryBg }]}>
+              <Text style={[styles.heroButtonText, { color: colors.btnPrimaryText }]}>START SYNCING →</Text>
             </TouchableOpacity>
           </Link>
           <Link href="/auth?mode=signin" asChild>
-            <TouchableOpacity style={styles.heroButtonOutline}>
-              <Text style={styles.heroButtonOutlineText}>Sign In</Text>
+            <TouchableOpacity style={[styles.heroButtonOutline, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'transparent' }]}>
+              <Text style={[styles.heroButtonOutlineText, { color: colors.textPrimary }]}>Sign In</Text>
             </TouchableOpacity>
           </Link>
         </View>
 
         {/* ─── Dashboard Preview ─── */}
         <Animated.View entering={FadeInUp.delay(300).duration(1000)} style={styles.previewContainer}>
-          <View style={styles.previewWindow}>
+          <View style={[styles.previewWindow, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
             {/* Title bar */}
-            <View style={styles.previewTitleBar}>
+            <View style={[styles.previewTitleBar, { backgroundColor: isDark ? '#131c2e' : '#f8f8f8', borderBottomColor: colors.border }]}>
               <View style={styles.previewDots}>
                 <View style={[styles.previewDot, { backgroundColor: '#ff6b6b' }]} />
                 <View style={[styles.previewDot, { backgroundColor: '#ffd93d' }]} />
                 <View style={[styles.previewDot, { backgroundColor: '#6bff8d' }]} />
               </View>
-              <Text style={styles.previewBarText}>StreamSync Studio</Text>
+              <Text style={[styles.previewBarText, { color: colors.textSecondary }]}>StreamSync Studio</Text>
               <View style={{ width: 40 }} />
             </View>
             {/* Mock content */}
-            <View style={styles.previewBody}>
-              <View style={styles.previewSidebar}>
+            <View style={[styles.previewBody, { backgroundColor: colors.bodyBg }]}>
+              <View style={[styles.previewSidebar, { backgroundColor: colors.sidebarBg, borderRightColor: colors.border }]}>
                 {['⬡', '◫', '◩', '◪'].map((i, idx) => (
                   <View key={idx} style={[styles.previewNavItem, idx === 0 && styles.previewNavItemActive]}>
-                    <Text style={[styles.previewNavIcon, idx === 0 && { color: '#00e5ff' }]}>{i}</Text>
+                    <Text style={[styles.previewNavIcon, idx === 0 && { color: colors.accent }]}>{i}</Text>
                   </View>
                 ))}
               </View>
               <View style={styles.previewMain}>
                 <View style={styles.previewStatRow}>
-                  {['#FF0000', '#E1306C', '#ffffff', '#1877F2'].map((c, i) => (
-                    <View key={i} style={[styles.previewStat, { borderTopColor: c, borderTopWidth: 2 }]}>
+                  {['#FF0000', '#E1306C', isDark ? '#ffffff' : '#000000', '#1877F2'].map((c, i) => (
+                    <View key={i} style={[styles.previewStat, { backgroundColor: colors.cardBg, borderColor: colors.border, borderTopColor: c, borderTopWidth: 2 }]}>
                       <View style={[styles.previewStatDot, { backgroundColor: c }]} />
                     </View>
                   ))}
                 </View>
-                <View style={styles.previewChart} />
+                <View style={[styles.previewChart, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }]} />
               </View>
             </View>
           </View>
@@ -111,8 +118,8 @@ export default function App() {
 
       {/* ─── Features Section ─── */}
       <Animated.View entering={FadeIn.delay(600).duration(1000)} style={styles.featuresSection}>
-        <Text style={styles.sectionTitle}>Built for multi-platform creators</Text>
-        <Text style={styles.sectionDesc}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Built for multi-platform creators</Text>
+        <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
           Stop switching between 5 different dashboards. StreamSync brings everything together.
         </Text>
 
@@ -122,19 +129,19 @@ export default function App() {
             { icon: '📊', title: 'Unified Analytics', desc: 'See aggregated metrics across all platforms. Compare performance side-by-side without spreadsheets.' },
             { icon: '📤', title: 'Cross-Post', desc: 'Write once, publish everywhere. Schedule and distribute content across all your connected platforms.' },
           ].map((f, i) => (
-            <View key={i} style={styles.featureCard}>
-              <View style={styles.featureIconWrap}>
+            <View key={i} style={[styles.featureCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <View style={[styles.featureIconWrap, { backgroundColor: colors.badgeBg }]}>
                 <Text style={styles.featureIcon}>{f.icon}</Text>
               </View>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureDesc}>{f.desc}</Text>
+              <Text style={[styles.featureTitle, { color: colors.textPrimary }]}>{f.title}</Text>
+              <Text style={[styles.featureDesc, { color: colors.textSecondary }]}>{f.desc}</Text>
             </View>
           ))}
         </View>
       </Animated.View>
 
       {/* ─── Footer ─── */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.cardBg }]}>
         <View style={styles.footerInner}>
           <View style={styles.footerBrand}>
             <Image
@@ -142,7 +149,7 @@ export default function App() {
               style={styles.logoIcon}
               resizeMode="contain"
             />
-            <Text style={styles.footerBrandName}>StreamSync</Text>
+            <Text style={[styles.footerBrandName, { color: colors.textPrimary }]}>StreamSync</Text>
           </View>
 
           <View style={styles.footerLinks}>
@@ -158,7 +165,7 @@ export default function App() {
               }}
               style={styles.footerLinkBtn}
             >
-              <Text style={styles.footerLinkText}>Privacy Policy</Text>
+              <Text style={[styles.footerLinkText, { color: colors.textSecondary }]}>Privacy Policy</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -173,7 +180,7 @@ export default function App() {
               }}
               style={styles.footerLinkBtn}
             >
-              <Text style={styles.footerLinkText}>Terms of Service</Text>
+              <Text style={[styles.footerLinkText, { color: colors.textSecondary }]}>Terms of Service</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -182,11 +189,11 @@ export default function App() {
               onPress={() => Linking.openURL('mailto:naveensujith31@gmail.com')}
               style={styles.footerLinkBtn}
             >
-              <Text style={styles.footerLinkText}>Contact Support</Text>
+              <Text style={[styles.footerLinkText, { color: colors.textSecondary }]}>Contact Support</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.footerText}>© 2026 StreamSync. All rights reserved.</Text>
+          <Text style={[styles.footerText, { color: colors.textMuted }]}>© 2026 StreamSync. All rights reserved.</Text>
         </View>
       </View>
 
