@@ -576,6 +576,12 @@ export default function ConnectsScreen() {
   }
 
   async function handlePhylloConnect() {
+    const clean = (igUsername || '').trim().replace(/^@/, '');
+    if (!clean) {
+      setIgModalError('Please enter your Instagram username in the field below first.');
+      return;
+    }
+
     setIgLoading(true);
     setIgModalError('');
     setIgModalSuccess('');
@@ -595,7 +601,7 @@ export default function ConnectsScreen() {
         throw new Error('Please sign in to connect via Phyllo.');
       }
 
-      setIgModalSuccess('Launching Phyllo Connect...');
+      setIgModalSuccess(`Connecting @${clean} with Phyllo...`);
       const tokenData = await getPhylloSdkToken({
         userId: currentUserId,
         userName: currentUserName,
@@ -611,15 +617,16 @@ export default function ConnectsScreen() {
         token: tokenData.sdkToken,
         environment: tokenData.environment || 'staging',
         workPlatformId: tokenData.workPlatformId,
+        username: clean,
         onAccountConnected: async (accountId, workPlatformId, userId) => {
-          setIgModalSuccess('Instagram account authenticated via Phyllo! Syncing analytics...');
+          setIgModalSuccess(`Authenticated @${clean} via Phyllo! Syncing analytics...`);
           try {
             await syncPhylloAccountData({
               accountId,
               userId: currentUserId,
-              username: igUsername || undefined,
+              username: clean,
             });
-            setIgModalSuccess('Instagram connected & synced successfully via Phyllo!');
+            setIgModalSuccess(`Connected @${clean} successfully via Phyllo!`);
             await fetchProfile(currentUserId);
             setTimeout(() => {
               setIgModalSuccess('');
@@ -1569,6 +1576,39 @@ export default function ConnectsScreen() {
             </View>
 
             <View style={styles.tabBody}>
+              <Text style={[styles.modalDesc, { color: colors.textSecondary, marginBottom: 12 }]}>
+                Enter your Instagram username below to connect via Phyllo and synchronize your followers, reel views, reach insights, and engagement metrics.
+              </Text>
+
+              {/* Primary Instagram Username Input Card */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME *</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                  placeholder="e.g. yourname, creators, or @yourname"
+                  placeholderTextColor={colors.textSecondary}
+                  value={igUsername}
+                  onChangeText={setIgUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                  Zero passwords, zero Meta App IDs, and zero bio codes required.
+                </Text>
+              </View>
+
+              {igModalError ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{igModalError}</Text>
+                </View>
+              ) : null}
+
+              {igModalSuccess ? (
+                <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                  <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
+                </View>
+              ) : null}
+
               {/* Phyllo Connect 1-Click Hero Button */}
               <TouchableOpacity 
                 style={[
@@ -1602,54 +1642,19 @@ export default function ConnectsScreen() {
                 )}
               </TouchableOpacity>
 
-              {igModalError ? (
-                <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerText}>{igModalError}</Text>
-                </View>
-              ) : null}
-
-              {igModalSuccess ? (
-                <View style={[styles.errorBanner, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                  <Text style={[styles.errorBannerText, { color: '#166534' }]}>{igModalSuccess}</Text>
-                </View>
-              ) : null}
-
-              {/* Divider */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 6 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                <Text style={{ marginHorizontal: 10, fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
-                  OR CONNECT BY USERNAME
+              {/* Quick Calibration Sync Button */}
+              <TouchableOpacity 
+                style={[
+                  styles.modalSecondaryBtn, 
+                  { backgroundColor: colors.cardBg, borderColor: colors.border, paddingVertical: 11 }
+                ]} 
+                onPress={handleInstagramQuickSync}
+                disabled={igLoading}
+              >
+                <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary, fontWeight: '600', fontSize: 13 }]}>
+                  Quick-Sync Public Metrics (Instant)
                 </Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              </View>
-
-              {/* Quick Username Input Card */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>YOUR INSTAGRAM USERNAME</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TextInput
-                    style={[styles.modalInput, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                    placeholder="e.g. yourname or @yourname"
-                    placeholderTextColor={colors.textSecondary}
-                    value={igUsername}
-                    onChangeText={setIgUsername}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity 
-                    style={[styles.modalPrimaryBtn, { backgroundColor: '#E1306C', width: 110, paddingVertical: 10 }]} 
-                    onPress={handleInstagramQuickSync}
-                    disabled={igLoading}
-                  >
-                    <Text style={[styles.modalPrimaryBtnText, { fontSize: 13, fontWeight: '700' }]}>
-                      Sync Stats
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                  Instant public handle calibration without credentials.
-                </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Advanced Accordion: Meta Developer OAuth (Optional) */}
               <TouchableOpacity 
