@@ -6,23 +6,27 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
   const { isDark, toggleTheme } = useTheme();
 
   const isSmall = size === 'small';
+  const slotSize = isSmall ? 24 : 28;
+
+  // Native animated fallback for iOS/Android
   const animValue = useRef(new Animated.Value(isDark ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.spring(animValue, {
-      toValue: isDark ? 1 : 0,
-      tension: 65,
-      friction: 8.5,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
+    if (Platform.OS !== 'web') {
+      Animated.spring(animValue, {
+        toValue: isDark ? 1 : 0,
+        tension: 70,
+        friction: 8.5,
+        useNativeDriver: true,
+      }).start();
+    }
   }, [isDark]);
-
-  const slotSize = isSmall ? 24 : 28;
 
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={toggleTheme}
+      dataSet={{ themeToggle: "true" }}
       style={[
         styles.container,
         isDark ? styles.containerDark : styles.containerLight,
@@ -33,88 +37,76 @@ export default function ThemeToggle({ style, showLabel = false, size = 'default'
       accessibilityLabel={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
       title={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
     >
-      {/* Animated Sliding Active Indicator Pill */}
-      <Animated.View
-        style={[
-          styles.slidingPill,
-          isSmall ? styles.slidingPillSmall : styles.slidingPillDefault,
-          isDark ? styles.pillDark : styles.pillLight,
-          {
-            transform: [
-              {
-                translateX: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, slotSize],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
+      {/* Sliding Active Indicator Pill */}
+      {Platform.OS === 'web' ? (
+        <View
+          style={[
+            styles.slidingPill,
+            isSmall ? styles.slidingPillSmall : styles.slidingPillDefault,
+            isDark ? styles.pillDark : styles.pillLight,
+            {
+              transform: [{ translateX: isDark ? slotSize : 0 }],
+              transition: 'transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.38s ease, border-color 0.38s ease, box-shadow 0.38s ease',
+            }
+          ]}
+        />
+      ) : (
+        <Animated.View
+          style={[
+            styles.slidingPill,
+            isSmall ? styles.slidingPillSmall : styles.slidingPillDefault,
+            isDark ? styles.pillDark : styles.pillLight,
+            {
+              transform: [
+                {
+                  translateX: animValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, slotSize],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      )}
 
       {/* Sun side (Day) */}
-      <Animated.View
+      <View
         style={[
           styles.iconSlot,
           isSmall && styles.iconSlotSmall,
-          {
-            opacity: animValue.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0.4],
-            }),
-            transform: [
-              {
-                scale: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1.08, 0.88],
-                }),
-              },
-              {
-                rotate: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '-24deg'],
-                }),
-              },
-            ],
-          },
+          Platform.OS === 'web' ? {
+            opacity: isDark ? 0.35 : 1,
+            transform: [{ scale: isDark ? 0.86 : 1.06 }, { rotate: isDark ? '-24deg' : '0deg' }],
+            transition: 'opacity 0.35s ease, transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+          } : {
+            opacity: !isDark ? 1 : 0.4,
+          }
         ]}
       >
         <Text style={[styles.iconText, isSmall && styles.iconTextSmall]}>
           ☀️
         </Text>
-      </Animated.View>
+      </View>
 
       {/* Moon side (Night) */}
-      <Animated.View
+      <View
         style={[
           styles.iconSlot,
           isSmall && styles.iconSlotSmall,
-          {
-            opacity: animValue.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.4, 1],
-            }),
-            transform: [
-              {
-                scale: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.88, 1.08],
-                }),
-              },
-              {
-                rotate: animValue.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['24deg', '0deg'],
-                }),
-              },
-            ],
-          },
+          Platform.OS === 'web' ? {
+            opacity: isDark ? 1 : 0.35,
+            transform: [{ scale: isDark ? 1.06 : 0.86 }, { rotate: isDark ? '0deg' : '24deg' }],
+            transition: 'opacity 0.35s ease, transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)',
+          } : {
+            opacity: isDark ? 1 : 0.4,
+          }
         ]}
       >
         <Text style={[styles.iconText, isSmall && styles.iconTextSmall]}>
           🌙
         </Text>
-      </Animated.View>
+      </View>
 
       {showLabel && (
         <Text style={[

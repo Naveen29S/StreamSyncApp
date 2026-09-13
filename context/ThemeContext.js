@@ -1,38 +1,94 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { useColorScheme, Platform, StyleSheet, Animated, Easing } from 'react-native';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useColorScheme, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+let flushSync = null;
+if (Platform.OS === 'web') {
+  try {
+    const rd = require('react-dom');
+    flushSync = rd.flushSync || null;
+  } catch (e) {}
+}
 
 const THEME_STORAGE_KEY = 'streamsync_theme_preference';
 
-// Web CSS injection for silky smooth theme transition between day and dark modes
+// Web CSS injection for silky-smooth, cinema-grade theme transition
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const STYLE_ID = 'streamsync-theme-transition-styles';
-  if (!document.getElementById(STYLE_ID)) {
-    const styleEl = document.createElement('style');
+  let styleEl = document.getElementById(STYLE_ID);
+  if (!styleEl) {
+    styleEl = document.createElement('style');
     styleEl.id = STYLE_ID;
     styleEl.type = 'text/css';
-    styleEl.appendChild(document.createTextNode(`
-      /* Global fade transition applied smoothly during theme switching */
-      html.theme-transitioning,
-      html.theme-transitioning *,
-      html.theme-transitioning *::before,
-      html.theme-transitioning *::after {
-        transition: background-color 0.38s cubic-bezier(0.4, 0, 0.2, 1),
-                    color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                    border-color 0.38s cubic-bezier(0.4, 0, 0.2, 1),
-                    box-shadow 0.38s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        transition-delay: 0s !important;
-      }
-
-      /* Native browser view transition support for cross-dissolving screens */
-      ::view-transition-old(root),
-      ::view-transition-new(root) {
-        animation-duration: 0.38s;
-        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-      }
-    `));
     document.head.appendChild(styleEl);
   }
+
+  styleEl.textContent = `
+    /* Keep the toggle button completely independent from root fade so its pill glides cleanly */
+    [data-theme-toggle="true"] {
+      view-transition-name: theme-toggle;
+    }
+    ::view-transition-old(theme-toggle),
+    ::view-transition-new(theme-toggle) {
+      animation: none;
+      mix-blend-mode: normal;
+    }
+
+    /* Native GPU-accelerated View Transition fade */
+    ::view-transition-image-pair(root) {
+      isolation: isolate;
+    }
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 0.38s;
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+      mix-blend-mode: normal;
+    }
+    ::view-transition-old(root) {
+      animation-name: streamsync-fade-out;
+    }
+    ::view-transition-new(root) {
+      animation-name: streamsync-fade-in;
+    }
+    @keyframes streamsync-fade-out {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+    @keyframes streamsync-fade-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Targeted CSS transitions for browsers without View Transitions */
+    html.theme-transitioning,
+    html.theme-transitioning body,
+    html.theme-transitioning #root {
+      transition: background-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+                  color 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    html.theme-transitioning div,
+    html.theme-transitioning header,
+    html.theme-transitioning nav,
+    html.theme-transitioning aside,
+    html.theme-transitioning main,
+    html.theme-transitioning section,
+    html.theme-transitioning button,
+    html.theme-transitioning input,
+    html.theme-transitioning textarea {
+      transition: background-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+                  color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+  `;
 }
 
 export const THEME_COLORS = {
@@ -111,16 +167,12 @@ const ThemeContext = createContext({
   toggleTheme: () => {},
   setTheme: () => {},
   isLoaded: false,
-  isTransitioning: false,
 });
 
 export function ThemeProvider({ children }) {
   const systemScheme = useColorScheme();
   const [theme, setThemeState] = useState('light');
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [outgoingColor, setOutgoingColor] = useState('#ffffff');
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     async function loadStoredTheme() {
@@ -144,46 +196,40 @@ export function ThemeProvider({ children }) {
     const valid = newTheme === 'dark' ? 'dark' : 'light';
     if (valid === theme) return;
 
-    // Capture outgoing background color for cross-fade dissolve
-    const prevBg = theme === 'dark' ? THEME_COLORS.dark.background : THEME_COLORS.light.background;
-    setOutgoingColor(prevBg);
-
-    // Apply Web transitions
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      try {
-        document.documentElement.classList.add('theme-transitioning');
-
-        const updateState = () => {
-          setThemeState(valid);
-        };
-
-        if (document.startViewTransition) {
-          document.startViewTransition(updateState);
-        } else {
-          updateState();
-        }
-
-        setTimeout(() => {
-          document.documentElement.classList.remove('theme-transitioning');
-        }, 420);
-      } catch (e) {
-        setThemeState(valid);
-      }
-    } else {
+    const commitTheme = () => {
       setThemeState(valid);
-    }
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        try {
+          const nextColors = valid === 'dark' ? THEME_COLORS.dark : THEME_COLORS.light;
+          document.documentElement.setAttribute('data-theme', valid);
+          document.documentElement.style.backgroundColor = nextColors.background;
+          document.body.style.backgroundColor = nextColors.background;
+          document.body.style.color = nextColors.textPrimary;
+        } catch (e) {}
+      }
+    };
 
-    // Trigger cross-fade overlay animation
-    setIsTransitioning(true);
-    fadeAnim.setValue(0.5);
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 380,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start(() => {
-      setIsTransitioning(false);
-    });
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && document.startViewTransition) {
+      try {
+        document.startViewTransition(() => {
+          if (flushSync) {
+            flushSync(commitTheme);
+          } else {
+            commitTheme();
+          }
+        });
+      } catch (e) {
+        commitTheme();
+      }
+    } else if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.classList.add('theme-transitioning');
+      commitTheme();
+      setTimeout(() => {
+        document.documentElement.classList.remove('theme-transitioning');
+      }, 420);
+    } else {
+      commitTheme();
+    }
 
     AsyncStorage.setItem(THEME_STORAGE_KEY, valid).catch(err => console.warn('Theme save error:', err));
   };
@@ -199,7 +245,7 @@ export function ThemeProvider({ children }) {
   const isDark = theme === 'dark';
   const colors = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
 
-  // Keep web DOM document background in sync so no white flashes occur on bounce or margins
+  // Sync initial DOM document state
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       try {
@@ -212,21 +258,8 @@ export function ThemeProvider({ children }) {
   }, [theme, colors]);
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, colors, toggleTheme, setTheme, isLoaded, isTransitioning }}>
+    <ThemeContext.Provider value={{ theme, isDark, colors, toggleTheme, setTheme, isLoaded }}>
       {children}
-      {isTransitioning && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              backgroundColor: outgoingColor,
-              opacity: fadeAnim,
-              zIndex: 999999,
-            },
-          ]}
-        />
-      )}
     </ThemeContext.Provider>
   );
 }
@@ -241,7 +274,6 @@ export function useTheme() {
       toggleTheme: () => {},
       setTheme: () => {},
       isLoaded: true,
-      isTransitioning: false,
     };
   }
   return context;
