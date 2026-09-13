@@ -395,6 +395,22 @@ serve(async (req) => {
       }
     }
 
+    // ==========================================
+    // INSTAGRAM INTEGRATION (Influencer API)
+    // ==========================================
+    if (platformsToUpdate.includes('ig') || platformsToUpdate.includes('instagram')) {
+      try {
+        const igHandle = apiKeys['ig_username'] || apiKeys['instagram_username'] || apiKeys['ig_handle'] || 'creators';
+        const cleanHandle = String(igHandle).replace(/^@/, '').trim();
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/instagram-influencer-api?username=${encodeURIComponent(cleanHandle)}&user_id=${encodeURIComponent(user.id)}`;
+        await fetch(fnUrl, {
+          headers: { Authorization: authHeader }
+        });
+      } catch (igErr) {
+        console.warn("Instagram sync warning:", igErr);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, message: "Sync complete" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
