@@ -151,7 +151,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
 
   // Instagram modal states
   const [igUsername, setIgUsername] = useState('creators');
-  const [igAccessToken, setIgAccessToken] = useState('');
   const [igLoading, setIgLoading] = useState(false);
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
@@ -568,7 +567,6 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         scopes = 'https://www.googleapis.com/auth/youtube.readonly';
         break;
       case 'fb':
-      case 'ig':
         provider = 'facebook';
         scopes = 'public_profile';
         break;
@@ -588,7 +586,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       const hasProviderIdentity = userIdentities.some(id => {
         if (platformKey === 'x') return id.provider === 'x' || id.provider === 'twitter';
         if (platformKey === 'yt') return id.provider === 'google';
-        if (platformKey === 'fb' || platformKey === 'ig') return id.provider === 'facebook';
+        if (platformKey === 'fb') return id.provider === 'facebook';
         if (platformKey === 'in') return id.provider === 'linkedin_oidc' || id.provider === 'linkedin';
         return false;
       });

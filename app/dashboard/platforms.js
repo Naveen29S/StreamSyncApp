@@ -100,7 +100,6 @@ export default function ConnectsScreen() {
   // Instagram modal states
   const [igModalVisible, setIgModalVisible] = useState(false);
   const [igUsername, setIgUsername] = useState('creators');
-  const [igAccessToken, setIgAccessToken] = useState('');
   const [igLoading, setIgLoading] = useState(false);
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
@@ -459,17 +458,14 @@ export default function ConnectsScreen() {
   }
 
   function openIgModal() {
-    const rawKey = apiKeys.ig || apiKeys.ig_token || '';
     const rawUser = apiKeys.ig_username || apiKeys.instagram_username || 'creators';
-    setIgAccessToken(rawKey);
     setIgUsername(rawUser);
     setIgModalError('');
     setIgModalSuccess('');
     setIgModalVisible(true);
   }
 
-  async function handleInstagramConnect(customToken, customUser) {
-    const tokenToUse = customToken !== undefined ? customToken : igAccessToken;
+  async function handleInstagramConnect(customUser) {
     const userToUse = (customUser !== undefined ? customUser : igUsername).trim();
 
     if (!userToUse) {
@@ -482,7 +478,7 @@ export default function ConnectsScreen() {
     setIgModalSuccess('');
 
     try {
-      await connectInstagramViaApiKey(userToUse, tokenToUse);
+      await connectInstagramViaApiKey(userToUse);
       setIgModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
       await fetchProfile(session.user.id);
       setTimeout(() => {
@@ -498,7 +494,7 @@ export default function ConnectsScreen() {
 
   async function handleQuickInfluencerConnect(username = 'creators') {
     setIgUsername(username);
-    await handleInstagramConnect('', username);
+    await handleInstagramConnect(username);
   }
 
   async function handleSyncIgNow() {
@@ -659,7 +655,7 @@ export default function ConnectsScreen() {
       const hasProviderIdentity = userIdentities.some(id => {
         if (platformId === 'x') return id.provider === 'x' || id.provider === 'twitter';
         if (platformId === 'yt') return id.provider === 'google';
-        if (platformId === 'fb' || platformId === 'ig') return id.provider === 'facebook';
+        if (platformId === 'fb') return id.provider === 'facebook';
         if (platformId === 'in') return id.provider === 'linkedin_oidc' || id.provider === 'linkedin';
         return false;
       });
