@@ -618,7 +618,16 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
 
     if (provider) {
       await AsyncStorage.setItem('pending_connection', platformKey);
-      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformKey));
+      const userIdentities = session?.user?.identities || [];
+      const hasProviderIdentity = userIdentities.some(id => {
+        if (platformKey === 'x') return id.provider === 'x' || id.provider === 'twitter';
+        if (platformKey === 'yt') return id.provider === 'google';
+        if (platformKey === 'fb' || platformKey === 'ig') return id.provider === 'facebook';
+        if (platformKey === 'in') return id.provider === 'linkedin_oidc' || id.provider === 'linkedin';
+        return false;
+      });
+
+      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformKey)) || hasProviderIdentity;
       const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
       
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/dashboard';

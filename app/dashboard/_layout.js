@@ -36,8 +36,19 @@ export default function DashboardLayout() {
       const profile = profileRes.data;
       const anRows = anRes.data || [];
       const identities = currentSession.user?.identities || [];
-      const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+      const providerToPlatformMap = { 
+        'google': 'yt', 
+        'facebook': 'fb', 
+        'twitter': 'x', 
+        'x': 'x', 
+        'linkedin_oidc': 'in', 
+        'linkedin': 'in' 
+      };
       const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+      const xIdentity = identities.find(id => id.provider === 'x' || id.provider === 'twitter');
+      if (xIdentity) {
+        identityPlatforms.push('x');
+      }
 
       const apiKeys = profile?.api_keys || {};
       const keyPlatforms = [];
@@ -47,7 +58,7 @@ export default function DashboardLayout() {
       if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
         keyPlatforms.push('twitch');
       }
-      if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
+      if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token || xIdentity) {
         keyPlatforms.push('x');
       }
       if (apiKeys.instagram || apiKeys.ig || apiKeys.ig_username || apiKeys.instagram_username || apiKeys.ig_token) {
@@ -81,7 +92,13 @@ export default function DashboardLayout() {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return;
-      if (!session) router.replace('/auth');
+      if (!session) {
+        const stored = await AsyncStorage.getItem('sb-dqyqczyqraddbmexnifi-auth-token').catch(() => null);
+        if (!stored && isMounted) {
+          router.replace('/auth');
+        }
+        return;
+      }
       setSession(session);
       if (session) {
         if (session.provider_token) {
@@ -94,9 +111,9 @@ export default function DashboardLayout() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
-      if (!session) {
+      if (event === 'SIGNED_OUT') {
         if (realtimeSub) {
           supabase.removeChannel(realtimeSub);
           realtimeSub = null;
@@ -104,6 +121,7 @@ export default function DashboardLayout() {
         router.replace('/auth');
         return;
       }
+      if (!session) return;
       setSession(session);
       
       if (session.provider_token) {

@@ -79,6 +79,21 @@ export default function DashboardIndex() {
     const profile = profileRes.data;
     const anRows = anRes.data || [];
 
+    const identities = session.user?.identities || [];
+    const providerToPlatformMap = { 
+      'google': 'yt', 
+      'facebook': 'fb', 
+      'twitter': 'x', 
+      'x': 'x', 
+      'linkedin_oidc': 'in', 
+      'linkedin': 'in' 
+    };
+    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+    const xIdentity = identities.find(id => id.provider === 'x' || id.provider === 'twitter');
+    if (xIdentity) {
+      identityPlatforms.push('x');
+    }
+
     const apiKeys = profile?.api_keys || {};
     const keyPlatforms = [];
     if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
@@ -87,7 +102,7 @@ export default function DashboardIndex() {
     if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
       keyPlatforms.push('twitch');
     }
-    if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token) {
+    if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token || xIdentity) {
       keyPlatforms.push('x');
     }
     if (apiKeys.instagram || apiKeys.ig || apiKeys.ig_username || apiKeys.instagram_username || apiKeys.ig_token) {
@@ -104,6 +119,7 @@ export default function DashboardIndex() {
 
     const rawList = [
       ...(profile?.connected_platforms || []),
+      ...identityPlatforms,
       ...keyPlatforms,
       ...anPlatforms
     ];

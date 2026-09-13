@@ -105,21 +105,40 @@ export default function ConnectsScreen() {
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
 
-  // Handle OAuth redirect errors
+  // Handle OAuth redirect errors or status notices
   useEffect(() => {
-    if (params?.error) {
-      const description = params.error_description?.replace(/\+/g, ' ') || 'An unknown error occurred';
-      if (params.error_code === 'identity_already_exists') {
-        alert('This platform account is already connected to your StreamSync profile!');
+    let err = params?.error;
+    let errCode = params?.error_code;
+    let errDesc = params?.error_description;
+
+    if (Platform.OS === 'web') {
+      try {
+        const stored = sessionStorage.getItem('streamsync_oauth_redirect_info');
+        if (stored) {
+          sessionStorage.removeItem('streamsync_oauth_redirect_info');
+          const parsed = JSON.parse(stored);
+          if (parsed.error || parsed.errorCode) {
+            err = err || parsed.error;
+            errCode = errCode || parsed.errorCode;
+            errDesc = errDesc || parsed.errorDescription;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (err || errCode) {
+      const isAlreadyLinked = errCode === 'identity_already_exists' || errCode === '422' || String(errDesc || '').toLowerCase().includes('already linked');
+      if (isAlreadyLinked) {
+        Alert.alert('Account Connected', 'This platform account is already linked to your StreamSync profile and active!');
       } else {
-        alert('Connection Failed: ' + description);
+        const description = errDesc ? String(errDesc).replace(/\+/g, ' ') : 'Connection could not be completed.';
+        Alert.alert('Connection Notice', description);
       }
       
-      // Clear params from URL securely without triggering infinite loops
+      // Clear URL params safely on web without triggering navigation re-renders
       if (Platform.OS === 'web') {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      router.setParams({ error: '', error_code: '', error_description: '' });
     }
 
     if (params?.connect) {
@@ -145,7 +164,6 @@ export default function ConnectsScreen() {
       if (Platform.OS === 'web') {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      router.setParams({ connect: '' });
     }
   }, [params?.error, params?.connect]);
 
@@ -162,19 +180,19 @@ export default function ConnectsScreen() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       if (session) {
         if (session.provider_token) {
           await processSessionOAuthTokens(session);
         }
         await fetchProfile(session.user.id);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         router.replace('/auth');
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe?.();
   }, []);
 
   const { registerRefreshListener } = useRefresh();
@@ -198,8 +216,19 @@ export default function ConnectsScreen() {
 
     const { data: { user } } = await supabase.auth.getUser();
     const identities = user?.identities || session?.user?.identities || [];
-    const providerToPlatformMap = { 'google': 'yt', 'facebook': 'fb', 'twitter': 'x', 'linkedin_oidc': 'in', 'linkedin': 'in' };
+    const providerToPlatformMap = { 
+      'google': 'yt', 
+      'facebook': 'fb', 
+      'twitter': 'x', 
+      'x': 'x', 
+      'linkedin_oidc': 'in', 
+      'linkedin': 'in' 
+    };
     const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
+    const xIdentity = identities.find(id => id.provider === 'x' || id.provider === 'twitter');
+    if (xIdentity) {
+      identityPlatforms.push('x');
+    }
 
     const profileKeys = data?.api_keys || {};
     const keyPlatforms = [];
@@ -209,7 +238,7 @@ export default function ConnectsScreen() {
     if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
       keyPlatforms.push('twitch');
     }
-    if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token) {
+    if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token || xIdentity) {
       keyPlatforms.push('x');
     }
     if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
@@ -251,6 +280,13 @@ export default function ConnectsScreen() {
         setTwitchUsername(data.api_keys.twitch_username || data.api_keys.twitch_login || 'shroud');
         setTwitchClientId(data.api_keys.twitch_client_id || '');
         setTwitchClientSecret(data.api_keys.twitch_client_secret || '');
+      }
+
+      const isX = platforms.includes('x');
+      if (isX) {
+        const xHandle = data.api_keys.x_username || data.api_keys.twitter_username || xIdentity?.identity_data?.user_name || xIdentity?.identity_data?.preferred_username || 'naveen_2907';
+        setXUsername(xHandle);
+        setXBearerToken(data.api_keys.x_bearer_token || data.api_keys.x || '');
       }
 
       const isIg = platforms.includes('ig');
@@ -638,7 +674,17 @@ export default function ConnectsScreen() {
 
     if (provider) {
       await AsyncStorage.setItem('pending_connection', platformId);
-      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformId));
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userIdentities = currentUser?.identities || session?.user?.identities || [];
+      const hasProviderIdentity = userIdentities.some(id => {
+        if (platformId === 'x') return id.provider === 'x' || id.provider === 'twitter';
+        if (platformId === 'yt') return id.provider === 'google';
+        if (platformId === 'fb' || platformId === 'ig') return id.provider === 'facebook';
+        if (platformId === 'in') return id.provider === 'linkedin_oidc' || id.provider === 'linkedin';
+        return false;
+      });
+
+      const isAlreadyConnected = connectedPlatforms.some(p => isPlatformMatch(p, platformId)) || hasProviderIdentity;
       const authMethod = isAlreadyConnected ? supabase.auth.signInWithOAuth : supabase.auth.linkIdentity;
 
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/dashboard/platforms';
@@ -725,19 +771,19 @@ export default function ConnectsScreen() {
   const isIgConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'ig'));
 
   // Animation values
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(20)).current;
+  const fadeAnim = React.useRef(new Animated.Value(1)).current;
+  const slideAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 400,
         useNativeDriver: false,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 600,
+        duration: 400,
         useNativeDriver: false,
       })
     ]).start();
@@ -747,9 +793,9 @@ export default function ConnectsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bodyBg }]}>
-      <Animated.ScrollView 
+      <ScrollView 
         contentContainerStyle={styles.scrollContent}
-        style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+        style={{ flex: 1, width: '100%' }}
       >
         
         {/* Header Section */}
@@ -834,7 +880,7 @@ export default function ConnectsScreen() {
           })}
         </View>
           
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* ─── YouTube Connection Modal ─── */}
       <Modal
