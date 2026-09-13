@@ -162,7 +162,7 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       cursor: pointer;
     }
 
-    /* Dark Mode: Completely borderless on all box grids + high-intensity radiant white outer shadows */
+    /* Dark Mode Resting: Sleek, completely borderless, deep dark elevation shadow */
     [data-theme="dark"] [data-grid-box="true"],
     [data-theme="dark"] .streamsync-grid-box,
     html[data-theme="dark"] [data-grid-box="true"],
@@ -188,19 +188,30 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       outline: none !important;
       outline-width: 0px !important;
       outline-color: transparent !important;
-      box-shadow: 0 10px 35px rgba(255, 255, 255, 0.25),
-                  0 3px 14px rgba(255, 255, 255, 0.18),
-                  0 0 20px rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55),
+                  0 2px 10px rgba(0, 0, 0, 0.35) !important;
     }
 
-    /* Dark Mode Hover: Lifts up (-5px), zero border, ultra-intense glowing white bloom */
+    /* Dark Mode Cursor Interaction (Hover / Active / Focus): Lifts up (-6px), zero border, SHOWS the brilliant radiant white shadows */
     [data-theme="dark"] [data-grid-box="true"]:hover,
     [data-theme="dark"] .streamsync-grid-box:hover,
     html[data-theme="dark"] [data-grid-box="true"]:hover,
     html[data-theme="dark"] .streamsync-grid-box:hover,
     body[data-theme="dark"] [data-grid-box="true"]:hover,
-    body[data-theme="dark"] .streamsync-grid-box:hover {
-      transform: translateY(-5px) !important;
+    body[data-theme="dark"] .streamsync-grid-box:hover,
+    [data-theme="dark"] [data-grid-box="true"]:active,
+    [data-theme="dark"] .streamsync-grid-box:active,
+    html[data-theme="dark"] [data-grid-box="true"]:active,
+    html[data-theme="dark"] .streamsync-grid-box:active,
+    body[data-theme="dark"] [data-grid-box="true"]:active,
+    body[data-theme="dark"] .streamsync-grid-box:active,
+    [data-theme="dark"] [data-grid-box="true"]:focus-within,
+    [data-theme="dark"] .streamsync-grid-box:focus-within,
+    html[data-theme="dark"] [data-grid-box="true"]:focus-within,
+    html[data-theme="dark"] .streamsync-grid-box:focus-within,
+    body[data-theme="dark"] [data-grid-box="true"]:focus-within,
+    body[data-theme="dark"] .streamsync-grid-box:focus-within {
+      transform: translateY(-6px) !important;
       border: 0px solid transparent !important;
       border-width: 0px !important;
       border-top-width: 0px !important;
@@ -220,7 +231,7 @@ function injectThemeTransitionStyles(cssDuration = '0.85s') {
       outline: none !important;
       outline-width: 0px !important;
       outline-color: transparent !important;
-      box-shadow: 0 22px 55px rgba(255, 255, 255, 0.45),
+      box-shadow: 0 20px 50px rgba(255, 255, 255, 0.45),
                   0 0 45px rgba(255, 255, 255, 0.35),
                   0 0 20px rgba(255, 255, 255, 0.25) !important;
       cursor: pointer;
@@ -293,8 +304,8 @@ export const THEME_COLORS = {
     badgeBg: '#1e293b',
     badgeText: '#cbd5e1',
     cardShadow: Platform.OS === 'web' 
-      ? { boxShadow: '0 8px 32px rgba(255, 255, 255, 0.25), 0 2px 12px rgba(255, 255, 255, 0.15)' } 
-      : { shadowColor: '#ffffff', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 8 },
+      ? { boxShadow: '0 8px 30px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.35)' } 
+      : { shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 8 },
     glowA: 'rgba(168, 85, 247, 0.22)',
     glowB: 'rgba(56, 189, 248, 0.18)',
   }
