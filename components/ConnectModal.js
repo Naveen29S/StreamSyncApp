@@ -382,7 +382,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         scopes = 'public_profile';
         break;
       case 'x':
-        provider = 'twitter';
+        provider = 'x';
         scopes = 'tweet.read users.read offline.access';
         break;
       case 'in':
@@ -408,6 +408,19 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         provider: provider,
         options: oauthOptions
       });
+
+      // Fallback between 'x' and legacy 'twitter' provider if one isn't enabled in Supabase
+      if (error && (provider === 'x' || provider === 'twitter')) {
+        const altProvider = provider === 'x' ? 'twitter' : 'x';
+        const altAttempt = await authMethod.call(supabase.auth, {
+          provider: altProvider,
+          options: oauthOptions
+        });
+        if (!altAttempt.error && altAttempt.data?.url) {
+          data = altAttempt.data;
+          error = null;
+        }
+      }
 
       if (error && authMethod === supabase.auth.linkIdentity && 
           (error.message?.includes('already') || error.code === 'identity_already_exists')) {
