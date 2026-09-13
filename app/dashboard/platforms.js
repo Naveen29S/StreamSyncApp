@@ -487,16 +487,31 @@ export default function ConnectsScreen() {
     setIgModalVisible(true);
   }
 
-  function handleProceedToIgVerify() {
-    const clean = (igUsername || '').trim().replace(/^@/, '');
-    if (!clean) {
-      setIgModalError('Please enter your Instagram handle.');
-      return;
+  async function handleProceedToIgVerify() {
+    try {
+      const clean = (igUsername || '').trim().replace(/^@/, '');
+      if (!clean) {
+        setIgModalError('Please enter your Instagram handle.');
+        return;
+      }
+      setIgModalError('');
+
+      let currentUserId = session?.user?.id;
+      if (!currentUserId) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          setSession(activeSession);
+          currentUserId = activeSession.user.id;
+        }
+      }
+
+      const code = generateInstagramVerificationCode(clean, currentUserId || 'creator');
+      setIgVerifyCode(code);
+      setIgStep('verify');
+    } catch (err) {
+      console.error("Error proceeding to Instagram verification in platforms:", err);
+      setIgModalError(err.message || 'Failed to generate verification code.');
     }
-    setIgModalError('');
-    const code = generateInstagramVerificationCode(clean, session?.user?.id || 'creator');
-    setIgVerifyCode(code);
-    setIgStep('verify');
   }
 
   async function handleVerifyIgOwnership() {
@@ -511,13 +526,24 @@ export default function ConnectsScreen() {
     setIgModalSuccess('');
 
     try {
+      let currentUserId = session?.user?.id;
+      if (!currentUserId) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          setSession(activeSession);
+          currentUserId = activeSession.user.id;
+        }
+      }
+
       await verifyInstagramOwnership({
         username: clean,
         code: igVerifyCode,
-        userId: session?.user?.id
+        userId: currentUserId
       });
       setIgModalSuccess(`Successfully verified & connected @${clean}!`);
-      await fetchProfile(session.user.id);
+      if (currentUserId) {
+        await fetchProfile(currentUserId);
+      }
       setTimeout(() => {
         setIgModalVisible(false);
         setIgModalSuccess('');
