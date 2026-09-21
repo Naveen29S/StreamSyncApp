@@ -1961,36 +1961,23 @@ export default function ConnectsScreen() {
                   style={{ width: 18, height: 18, marginRight: 10 }} 
                 />
                 <Text style={[styles.googleOAuthBtnText, { color: '#ffffff' }]}>
-                  {syncing === 'in' ? "Connecting to LinkedIn..." : "Continue with LinkedIn OIDC"}
+                  {syncing === 'in' ? "Connecting to LinkedIn..." : "Continue with LinkedIn OAuth"}
                 </Text>
               </TouchableOpacity>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
                 <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
                 <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                  OR CONNECT VIA API KEY / TOKEN
+                  OR ENTER LINKEDIN ACCESS TOKEN
                 </Text>
                 <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN PROFILE OR COMPANY HANDLE *</Text>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (BEARER TOKEN)</Text>
                 <TextInput
                   style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. satyanadella or google"
-                  placeholderTextColor={colors.textSecondary}
-                  value={inProfile}
-                  onChangeText={setInProfile}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (API KEY)</Text>
-                <TextInput
-                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. AQX... or OAuth Bearer Token"
+                  placeholder="e.g. AQX... (OAuth Access Token)"
                   placeholderTextColor={colors.textSecondary}
                   value={inAccessToken}
                   onChangeText={setInAccessToken}
@@ -2002,7 +1989,7 @@ export default function ConnectsScreen() {
 
               <TouchableOpacity onPress={() => Linking.openURL('https://www.linkedin.com/developers/apps')}>
                 <Text style={{ fontSize: 12, color: '#0A66C2', fontWeight: '600', marginBottom: 12 }}>
-                  Create an API key / app at linkedin.com/developers ↗
+                  Generate a Token at linkedin.com/developers ↗
                 </Text>
               </TouchableOpacity>
 
@@ -2022,7 +2009,7 @@ export default function ConnectsScreen() {
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
                   <Text style={styles.modalPrimaryBtnText}>
-                    {isLinkedInConnected ? 'Update LinkedIn Account' : 'Connect LinkedIn Account'}
+                    {isLinkedInConnected ? 'Update Token' : 'Connect via Token'}
                   </Text>
                 )}
               </TouchableOpacity>

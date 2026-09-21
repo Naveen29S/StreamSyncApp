@@ -1612,23 +1612,10 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                     </View>
 
                     <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN PROFILE OR COMPANY HANDLE *</Text>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (BEARER TOKEN)</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. your_profile_or_company_handle"
-                        placeholderTextColor={colors.textSecondary}
-                        value={inProfileName}
-                        onChangeText={setInProfileName}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
-
-                    <View style={styles.formGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (OPTIONAL)</Text>
-                      <TextInput
-                        style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. Enter your LinkedIn Access Token"
+                        placeholder="e.g. AQX... (LinkedIn Developer Access Token)"
                         placeholderTextColor={colors.textSecondary}
                         value={inAccessToken}
                         onChangeText={setInAccessToken}
@@ -1640,7 +1627,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
 
                     <TouchableOpacity onPress={() => Linking.openURL('https://www.linkedin.com/developers/apps')}>
                       <Text style={{ fontSize: 12, color: '#0A66C2', fontWeight: '600' }}>
-                        Create a developer app at linkedin.com/developers ↗
+                        Generate a developer token at linkedin.com/developers ↗
                       </Text>
                     </TouchableOpacity>
 
