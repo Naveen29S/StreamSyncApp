@@ -390,12 +390,7 @@ export default function ThreeDStatCard({
         </View>
       )}
 
-      {/* Cyberpunk corner telemetry tag */}
-      <View style={styles.cornerIndicator}>
-        <Text style={[styles.cornerText, { color: activeSurface.brandColor }]}>
-          3D // {activeSurface.platformName.toUpperCase()}
-        </Text>
-      </View>
+      {/* Corner indicator removed per user request */}
     </View>
   );
 }
@@ -411,19 +406,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     position: 'relative',
     overflow: 'hidden',
-  },
-  cornerIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    pointerEvents: 'none',
-  },
-  cornerText: {
-    fontSize: 9,
-    fontFamily: mono,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    opacity: 0.75,
   },
   mobileFallback: {
     flex: 1,

@@ -8,64 +8,64 @@ const PLATFORM_META = {
     name: 'All Platforms',
     color: '#6366f1',
     bg: 'rgba(99, 102, 241, 0.15)',
-    captionReach: 'Combined views across platforms',
-    captionAudience: 'Followers & subscribers unified',
-    captionEngage: 'Average across platforms',
-    captionRevenue: 'Monthly creator revenue run-rate',
+    captionReach: 'Rolling 30-day reach & impressions',
+    captionAudience: 'Active community & subscribers',
+    captionEngage: 'Weighted cross-platform interactions',
+    captionRevenue: 'Estimated monthly creator value',
   },
   yt: {
     name: 'YouTube',
     color: '#FF0000',
     bg: 'rgba(255, 0, 0, 0.15)',
-    captionReach: 'Channel lifetime views',
-    captionAudience: 'Subscribers',
-    captionEngage: 'Upload engagement rate',
+    captionReach: 'Watch hours & impressions',
+    captionAudience: 'Channel subscribers',
+    captionEngage: 'Likes, comments & CTR',
     captionRevenue: 'Estimated AdSense revenue',
   },
   ig: {
     name: 'Instagram',
     color: '#E1306C',
     bg: 'rgba(225, 48, 108, 0.15)',
-    captionReach: 'Reel & story impressions',
+    captionReach: 'Accounts reached & impressions',
     captionAudience: 'Profile followers',
-    captionEngage: 'Likes, comments & shares',
-    captionRevenue: 'Brand partnership rate',
+    captionEngage: 'Saves, shares & comments',
+    captionRevenue: 'Brand partnership valuation',
   },
   x: {
     name: 'X (Twitter)',
     color: '#38bdf8',
     bg: 'rgba(56, 189, 248, 0.15)',
-    captionReach: 'Total post impressions',
-    captionAudience: 'X followers',
-    captionEngage: 'Replies, quotes & reposts',
-    captionRevenue: 'X Ads revenue share',
+    captionReach: 'Post impressions & expands',
+    captionAudience: 'Followers on X',
+    captionEngage: 'Reposts, quotes & replies',
+    captionRevenue: 'Creator ad revenue share',
   },
   twitch: {
     name: 'Twitch',
     color: '#9146FF',
     bg: 'rgba(145, 70, 255, 0.15)',
-    captionReach: 'Broadcast & VOD views',
+    captionReach: 'Stream hours & VOD views',
     captionAudience: 'Channel followers',
-    captionEngage: 'Chat & clip interaction',
+    captionEngage: 'Chat velocity & clips',
     captionRevenue: 'Subscriptions & bits',
   },
   fb: {
     name: 'Facebook',
     color: '#1877F2',
     bg: 'rgba(24, 119, 242, 0.15)',
-    captionReach: 'Page & post impressions',
+    captionReach: 'Page & video impressions',
     captionAudience: 'Page followers & likes',
-    captionEngage: 'Reactions & comments',
-    captionRevenue: 'Facebook Stars & In-stream',
+    captionEngage: 'Reactions, comments & shares',
+    captionRevenue: 'In-stream stars & bonuses',
   },
   in: {
     name: 'LinkedIn',
     color: '#0A66C2',
     bg: 'rgba(10, 102, 194, 0.15)',
-    captionReach: 'Post & article impressions',
+    captionReach: 'Post & member impressions',
     captionAudience: 'Connections & followers',
-    captionEngage: 'Reactions & reposts',
-    captionRevenue: 'Creator consulting value',
+    captionEngage: 'Reactions, comments & reposts',
+    captionRevenue: 'Consulting & advisory value',
   },
 };
 
@@ -125,10 +125,10 @@ export default function ThreeDStatsRow({
       platformKey: 'all',
       brandColor: unifiedMeta.color,
       brandBg: unifiedMeta.bg,
-      label: 'Total Reach',
+      label: '30-Day Reach',
       value: totalViews.toLocaleString(),
       caption: unifiedMeta.captionReach,
-      trend: totalViews > 0 ? 'Live' : '—',
+      trend: totalViews > 0 ? 'Live 30d' : '—',
     });
 
     audience.push({
@@ -136,7 +136,7 @@ export default function ThreeDStatsRow({
       platformKey: 'all',
       brandColor: unifiedMeta.color,
       brandBg: unifiedMeta.bg,
-      label: 'Audience',
+      label: 'Total Community',
       value: totalFollowers.toLocaleString(),
       caption: unifiedMeta.captionAudience,
       trend: totalFollowers > 0 ? 'Active' : '—',
@@ -147,10 +147,10 @@ export default function ThreeDStatsRow({
       platformKey: 'all',
       brandColor: unifiedMeta.color,
       brandBg: unifiedMeta.bg,
-      label: 'Engagement',
+      label: 'True Engagement',
       value: engagementRate,
       caption: unifiedMeta.captionEngage,
-      trend: parseFloat(engagementRate || 0) > 0 ? 'Real-time' : '—',
+      trend: parseFloat(engagementRate || 0) > 0 ? 'Live Rate' : '—',
     });
 
     revenue.push({
@@ -158,10 +158,10 @@ export default function ThreeDStatsRow({
       platformKey: 'all',
       brandColor: unifiedMeta.color,
       brandBg: unifiedMeta.bg,
-      label: 'Revenue',
+      label: 'Creator Value',
       value: estimatedRev < 0 ? 'Unmonetized' : `$${Number(estimatedRev).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
       caption: estimatedRev < 0 ? 'Grow audience to unlock' : unifiedMeta.captionRevenue,
-      trend: 'Est.',
+      trend: 'Est. Run-Rate',
     });
 
     // Subsequent Surfaces: Each active platform
@@ -170,10 +170,10 @@ export default function ThreeDStatsRow({
         name: normalizePlatformName(key),
         color: '#6366f1',
         bg: 'rgba(99, 102, 241, 0.15)',
-        captionReach: 'Platform views',
-        captionAudience: 'Platform followers',
-        captionEngage: 'Platform engagement',
-        captionRevenue: 'Platform earnings',
+        captionReach: '30-day reach & impressions',
+        captionAudience: 'Platform audience',
+        captionEngage: 'Active interactions',
+        captionRevenue: 'Platform valuation',
       };
 
       const pStats = data?.platformStats?.[meta.name] || 
@@ -199,7 +199,7 @@ export default function ThreeDStatsRow({
         label: `${meta.name} Reach`,
         value: pViews,
         caption: meta.captionReach,
-        trend: pViews !== '0' ? 'Live' : 'Connected',
+        trend: pViews !== '0' ? 'Live 30d' : 'Connected',
       });
 
       audience.push({
@@ -218,10 +218,10 @@ export default function ThreeDStatsRow({
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Engagement`,
+        label: `${meta.name} Engage`,
         value: pEngage,
         caption: meta.captionEngage,
-        trend: parseFloat(pEngage || 0) > 0 ? 'Live' : 'Tracked',
+        trend: parseFloat(pEngage || 0) > 0 ? 'Live Rate' : 'Tracked',
       });
 
       revenue.push({
@@ -229,10 +229,10 @@ export default function ThreeDStatsRow({
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Revenue`,
+        label: `${meta.name} Value`,
         value: pRevStr,
         caption: meta.captionRevenue,
-        trend: 'Est.',
+        trend: 'Est. Run-Rate',
       });
     });
 

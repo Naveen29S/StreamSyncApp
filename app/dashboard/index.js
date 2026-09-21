@@ -395,14 +395,14 @@ export default function DashboardIndex() {
                     <Text style={[styles.platformMetricVal, { color: colors.textPrimary }]}>
                       {stats?.followers || '0'}
                     </Text>
-                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Followers</Text>
+                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Audience</Text>
                   </View>
                   <View style={[styles.platformMetricDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.platformMetricItem}>
                     <Text style={[styles.platformMetricVal, { color: colors.textPrimary }]}>
                       {stats?.views || '0'}
                     </Text>
-                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>Views</Text>
+                    <Text style={[styles.platformMetricLabel, { color: colors.textMuted }]}>30D Reach</Text>
                   </View>
                   <View style={[styles.platformMetricDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.platformMetricItem}>
