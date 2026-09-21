@@ -840,14 +840,8 @@ serve(async (req: Request) => {
     let profileData: InfluencerPreset | null = null;
     let source = "calibrated";
 
-    // 1. Check Presets First for ultra-fast response and 100% verified rich media
-    if (INFLUENCER_PRESETS[normalizedKey]) {
-      profileData = { ...INFLUENCER_PRESETS[normalizedKey] };
-      source = "preset";
-    }
-
-    // 2. If not a preset, attempt live Instagram Web endpoint
-    if (!profileData && cleanUser) {
+    // 1. Attempt live Instagram Web endpoint
+    if (cleanUser) {
       const liveData = await fetchFromInstagramWeb(cleanUser);
       if (liveData) {
         profileData = liveData;
@@ -855,10 +849,22 @@ serve(async (req: Request) => {
       }
     }
 
-    // 3. If live web endpoint is blocked or empty, generate calibrated deterministic data
+    // 2. If live web endpoint is unavailable, return clean zero-data without fake metrics
     if (!profileData) {
-      profileData = generateCalibratedProfile(cleanUser || "creator");
-      source = "calibrated";
+      profileData = {
+        id: `ig_${cleanUser}`,
+        username: `@${cleanUser}`,
+        title: `@${cleanUser}`,
+        description: `Instagram Profile for @${cleanUser}`,
+        avatarUrl: "",
+        totalFollowers: 0,
+        totalViews: 0,
+        videoCount: 0,
+        engagementRate: 0,
+        estimatedRevenue: 0,
+        videos: [],
+      };
+      source = "zero_data";
     }
 
     let isVerified = true;
