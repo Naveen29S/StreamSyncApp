@@ -258,7 +258,12 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
         if (profile.api_keys.fb_page) setFbPageName(profile.api_keys.fb_page);
       }
       if (platforms.includes('in')) {
-        if (profile.api_keys.in_profile) setInProfileName(profile.api_keys.in_profile);
+        if (profile.api_keys.in_username || profile.api_keys.in_profile) {
+          setInProfileName(profile.api_keys.in_username || profile.api_keys.in_profile);
+        }
+        if (profile.api_keys.in || profile.api_keys.in_token) {
+          setInAccessToken(profile.api_keys.in || profile.api_keys.in_token);
+        }
       }
     }
   };
@@ -325,7 +330,8 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   } else if (pKey === 'fb') {
     channelHandle = apiKeys.fb_page || '';
   } else if (pKey === 'in') {
-    channelHandle = apiKeys.in_profile ? `@${apiKeys.in_profile.replace(/^@/, '')}` : '';
+    const handleStr = apiKeys.in_username || apiKeys.in_profile || apiKeys.in_title || '';
+    channelHandle = handleStr ? `@${handleStr.replace(/^@/, '')}` : '';
   }
 
   // Profile URL
@@ -633,7 +639,8 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     setInModalSuccess('');
     try {
       const data = await connectLinkedInViaApiKey(profileToUse, tokenToUse);
-      setInModalSuccess(`Connected "${profileToUse}" successfully!`);
+      const nameToShow = data.channel?.title || profileToUse;
+      setInModalSuccess(`Connected @${nameToShow} successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
