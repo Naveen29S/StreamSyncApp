@@ -338,24 +338,8 @@ export default function DashboardIndex() {
                   <Image source={{ uri: config.logo }} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 </View>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
-                    {isConnected && handle ? (
-                      <View style={{
-                        paddingHorizontal: 7,
-                        paddingVertical: 2,
-                        borderRadius: 6,
-                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.08)',
-                        borderWidth: 1,
-                        borderColor: isDark ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.2)',
-                      }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: config.color || '#6366f1' }} numberOfLines={1}>
-                          @{String(handle).replace(/^@/, '')}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={2}>{statusText}</Text>
+                  <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                  <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={1}>{statusText}</Text>
                 </View>
                 
                 {isConnected && (

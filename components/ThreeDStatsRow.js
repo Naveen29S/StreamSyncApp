@@ -205,46 +205,46 @@ export default function ThreeDStatsRow({
       const handleTag = rawHandle ? `@${String(rawHandle).replace(/^@/, '')}` : '';
 
       reach.push({
-        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
+        platformName: meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: handleTag ? `${handleTag} Reach` : `${meta.name} Reach`,
+        label: `${meta.name} Reach`,
         value: pViews,
-        caption: handleTag ? `${handleTag} • ${meta.captionReach}` : meta.captionReach,
+        caption: meta.captionReach,
         trend: pViews !== '0' ? 'Live 30d' : 'Connected',
       });
 
       audience.push({
-        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
+        platformName: meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: handleTag ? `${handleTag} Audience` : `${meta.name} Audience`,
+        label: `${meta.name} Audience`,
         value: pFollowers,
-        caption: handleTag ? `${handleTag} • ${meta.captionAudience}` : meta.captionAudience,
+        caption: meta.captionAudience,
         trend: pFollowers !== '0' ? 'Active' : 'Connected',
       });
 
       engagement.push({
-        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
+        platformName: meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: handleTag ? `${handleTag} Engage` : `${meta.name} Engage`,
+        label: `${meta.name} Engage`,
         value: pEngage,
-        caption: handleTag ? `${handleTag} • ${meta.captionEngage}` : meta.captionEngage,
+        caption: meta.captionEngage,
         trend: parseFloat(pEngage || 0) > 0 ? 'Live Rate' : 'Tracked',
       });
 
       revenue.push({
-        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
+        platformName: meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: handleTag ? `${handleTag} Value` : `${meta.name} Value`,
+        label: `${meta.name} Value`,
         value: pRevStr,
-        caption: handleTag ? `${handleTag} • ${meta.captionRevenue}` : meta.captionRevenue,
+        caption: meta.captionRevenue,
         trend: 'Est. Run-Rate',
       });
     });
