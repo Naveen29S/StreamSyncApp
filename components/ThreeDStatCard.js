@@ -15,7 +15,7 @@ export default function ThreeDStatCard({
   intervalMs = 4500,
   isDark = true,
   colors = {},
-  isAutoRotate = true,
+  isAutoRotate = false,
   onSurfaceChange = null,
 }) {
   const containerRef = useRef(null);
@@ -31,7 +31,7 @@ export default function ThreeDStatCard({
       platformName: 'All Platforms',
       platformKey: 'all',
       brandColor: '#6366f1',
-      brandBg: 'rgba(99, 102, 241, 0.15)',
+      brandBg: 'rgba(99, 102, 241, 0.25)',
       value: '0',
       label: title.toUpperCase(),
       caption: 'Live telemetry stream',
@@ -49,11 +49,11 @@ export default function ThreeDStatCard({
     const container = containerRef.current;
     const canvas = canvasRef.current;
     let width = container.clientWidth || 280;
-    let height = container.clientHeight || 160;
+    let height = container.clientHeight || 170;
 
-    // 1. Generate Individual High-DPI Canvas Textures for each surface
-    const texWidth = 512;
-    const texHeight = 320;
+    // 1. Generate High-Definition 1024x640 Canvas Textures for Razor-Sharp Text
+    const texWidth = 1024;
+    const texHeight = 640;
     const textures = [];
 
     for (let i = 0; i < N; i++) {
@@ -63,115 +63,103 @@ export default function ThreeDStatCard({
       faceCanvas.height = texHeight;
       const ctx = faceCanvas.getContext('2d');
 
-      // Card Background Gradient
+      // Crisp Modern Dark Surface Background (Solid, High-Contrast, Zero Muddy Glaze)
       const bgGrad = ctx.createLinearGradient(0, 0, texWidth, texHeight);
       if (isDark) {
-        bgGrad.addColorStop(0, '#0a0f1d');
-        bgGrad.addColorStop(0.5, '#0f172a');
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(0.5, '#131e36');
         bgGrad.addColorStop(1, '#1e293b');
       } else {
         bgGrad.addColorStop(0, '#ffffff');
-        bgGrad.addColorStop(0.6, '#f8fafc');
         bgGrad.addColorStop(1, '#f1f5f9');
       }
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, texWidth, texHeight);
 
-      // Cyber Gridlines / Tech Accents
-      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(0, 72);
-      ctx.lineTo(texWidth, 72);
-      ctx.moveTo(0, 245);
-      ctx.lineTo(texWidth, 245);
-      ctx.stroke();
+      // Sharp Crisp Outer Border
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.12)';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(6, 6, texWidth - 12, texHeight - 12);
 
-      // Top Brand Accent Line
-      const glowGrad = ctx.createLinearGradient(0, 0, texWidth, 0);
-      glowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      glowGrad.addColorStop(0.5, surf.brandColor || '#6366f1');
-      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glowGrad;
-      ctx.fillRect(30, 0, texWidth - 60, 5);
+      // Top Brand Color Accent Bar
+      ctx.fillStyle = surf.brandColor || '#6366f1';
+      ctx.fillRect(24, 6, texWidth - 48, 8);
 
-      // Card Border with subtle rounded bevel
-      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(3, 3, texWidth - 6, texHeight - 6);
-
-      // Top Header: Metric Category Title
+      // Top Header Left: Category Title
       ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
-      ctx.font = 'bold 18px monospace';
+      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText((surf.label || title).toUpperCase(), 32, 46);
+      ctx.fillText((surf.label || title).toUpperCase(), 48, 80);
 
-      // Top Header Right: Brand Pill Badge
-      const badgeWidth = 148;
-      const badgeHeight = 32;
-      const badgeX = texWidth - badgeWidth - 32;
-      const badgeY = 24;
+      // Top Header Right: Brand Badge Pill
+      const badgeWidth = 240;
+      const badgeHeight = 52;
+      const badgeX = texWidth - badgeWidth - 48;
+      const badgeY = 44;
 
-      ctx.fillStyle = surf.brandBg || 'rgba(99, 102, 241, 0.18)';
+      ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
       ctx.beginPath();
       if (ctx.roundRect) {
-        ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 16);
+        ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 26);
       } else {
         ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
       }
       ctx.fill();
 
       ctx.strokeStyle = surf.brandColor || '#6366f1';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
 
       // Badge Text
       ctx.fillStyle = surf.brandColor || '#6366f1';
-      ctx.font = 'bold 14px sans-serif';
+      ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(surf.platformName, badgeX + badgeWidth / 2, badgeY + 21);
+      ctx.fillText(surf.platformName, badgeX + badgeWidth / 2, badgeY + 34);
 
-      // Center: Large Bold Value
+      // Center: Giant Bold Sharp Numerical Value
       ctx.fillStyle = isDark ? '#ffffff' : '#0f172a';
       const valStr = String(surf.value ?? '0');
-      ctx.font = valStr.length > 9 ? 'bold 44px sans-serif' : 'bold 56px sans-serif';
+      ctx.font = valStr.length > 9 
+        ? 'bold 72px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        : 'bold 88px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(valStr, 32, 160);
+      ctx.fillText(valStr, 48, 290);
 
-      // Caption Subtitle
-      ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
-      ctx.font = '15px sans-serif';
-      ctx.fillText(surf.caption || 'Live metric telemetry', 32, 202);
+      // Middle Caption Subtitle
+      ctx.fillStyle = isDark ? '#cbd5e1' : '#475569';
+      ctx.font = '500 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(surf.caption || 'Live metric telemetry', 48, 370);
 
-      // Bottom Status / Trend
+      // Bottom Left Status Indicator
       ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 15px monospace';
-      ctx.fillText(`↑ ${surf.trend || 'Live'}`, 32, 285);
+      ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`↑ ${surf.trend || 'Live'}`, 48, 560);
 
-      // Bottom Pagination Dots
+      // Bottom Right Pagination Indicator Dots
       const dotCount = safeSurfaces.length;
-      const dotRadius = 4.5;
-      const dotGap = 15;
-      const startDotX = texWidth - 32 - (dotCount * dotGap);
+      const dotRadius = 9;
+      const dotGap = 30;
+      const startDotX = texWidth - 64 - (dotCount * dotGap);
       for (let d = 0; d < dotCount; d++) {
         ctx.beginPath();
-        ctx.arc(startDotX + (d * dotGap), 280, dotRadius, 0, Math.PI * 2);
+        ctx.arc(startDotX + (d * dotGap), 550, dotRadius, 0, Math.PI * 2);
         ctx.fillStyle = (d === (i % safeSurfaces.length))
           ? (surf.brandColor || '#6366f1')
-          : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)');
+          : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)');
         ctx.fill();
       }
 
       const texture = new THREE.CanvasTexture(faceCanvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = true;
       textures.push(texture);
     }
 
     // 2. Three.js Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(0, 0, 4.2);
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+    camera.position.set(0, 0, 4.3);
 
     let renderer;
     try {
@@ -181,7 +169,7 @@ export default function ThreeDStatCard({
         alpha: true,
         powerPreference: 'high-performance',
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
       renderer.setSize(width, height, false);
       renderer.setClearColor(0x000000, 0);
     } catch (e) {
@@ -355,15 +343,7 @@ export default function ThreeDStatCard({
   return (
     <View
       ref={containerRef}
-      style={[
-        styles.cardContainer,
-        {
-          backgroundColor: isDark ? '#090d16' : '#ffffff',
-          borderColor: isHovered
-            ? (activeSurface.brandColor || '#6366f1')
-            : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'),
-        }
-      ]}
+      style={styles.cardContainer}
     >
       {Platform.OS === 'web' ? (
         <canvas
@@ -372,7 +352,7 @@ export default function ThreeDStatCard({
             width: '100%',
             height: '100%',
             display: 'block',
-            borderRadius: 16,
+            cursor: 'pointer',
           }}
         />
       ) : (
@@ -389,8 +369,6 @@ export default function ThreeDStatCard({
           <Text style={[styles.fallbackCaption, { color: colors.textMuted }]}>{activeSurface.caption}</Text>
         </View>
       )}
-
-      {/* Corner indicator removed per user request */}
     </View>
   );
 }
@@ -401,11 +379,11 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     minWidth: 240,
-    height: 160,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    height: 170,
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   mobileFallback: {
     flex: 1,

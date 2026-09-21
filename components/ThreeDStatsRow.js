@@ -81,7 +81,7 @@ export default function ThreeDStatsRow({
   isDark = true,
   intervalMs = 4500,
 }) {
-  const [isAutoRotate, setIsAutoRotate] = useState(true);
+  const [isAutoRotate, setIsAutoRotate] = useState(false);
   const [activePlatformIndex, setActivePlatformIndex] = useState(0);
 
   // Determine active platforms
@@ -248,18 +248,12 @@ export default function ThreeDStatsRow({
 
   return (
     <View style={styles.container}>
-      {/* Futuristic HUD Header Controls */}
+      {/* Clean Controls Header */}
       <View style={styles.hudBar}>
         <View style={styles.hudLeft}>
-          <View style={[styles.pulseBeacon, { backgroundColor: isAutoRotate ? '#10b981' : '#f59e0b' }]} />
-          <Text style={[styles.hudTitle, { color: colors.textPrimary }]}>
-            3D HOLOGRAPHIC PRISM TELEMETRY
+          <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>
+            Overview Telemetry • Tap any card to flip platform
           </Text>
-          <View style={[styles.modeTag, { borderColor: isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.2)' }]}>
-            <Text style={styles.modeTagText}>
-              {reachSurfaces.length} SURFACES // UPWARD ROLL
-            </Text>
-          </View>
         </View>
 
         <View style={styles.hudRight}>
@@ -270,13 +264,13 @@ export default function ThreeDStatsRow({
               {
                 backgroundColor: isAutoRotate 
                   ? (isDark ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)')
-                  : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
+                  : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
                 borderColor: isAutoRotate ? '#6366f1' : colors.border
               }
             ]}
           >
             <Text style={[styles.ctrlBtnText, { color: isAutoRotate ? '#818cf8' : colors.textSecondary }]}>
-              {isAutoRotate ? '❚❚ AUTO-ROLL ON' : '▶ RESUME AUTO-ROLL'}
+              {isAutoRotate ? '❚❚ AUTO-ROLL ON' : '▶ AUTO-ROLL'}
             </Text>
           </TouchableOpacity>
         </View>
