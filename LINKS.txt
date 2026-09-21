@@ -1,0 +1,22 @@
+StreamSync Production Website: https://stream-sync-app.vercel.app/
+Authentication / Sign In: https://stream-sync-app.vercel.app/auth
+Privacy Policy: https://stream-sync-app.vercel.app/privacy.html
+Terms of Service: https://stream-sync-app.vercel.app/terms.html
+Google Site Verification: https://stream-sync-app.vercel.app/google01b7a301b7069c9f.html
+Dashboard Overview: https://stream-sync-app.vercel.app/dashboard
+Platforms Connection Hub: https://stream-sync-app.vercel.app/dashboard/platforms
+Analytics: https://stream-sync-app.vercel.app/dashboard/analytics
+Content Manager: https://stream-sync-app.vercel.app/dashboard/content
+Comments: https://stream-sync-app.vercel.app/dashboard/comments
+Schedule: https://stream-sync-app.vercel.app/dashboard/schedule
+Settings: https://stream-sync-app.vercel.app/dashboard/settings
+Google Cloud Console: https://console.cloud.google.com/apis/credentials
+Google Permissions: https://security.google.com/settings/security/permissions
+Google Privacy Policy: https://policies.google.com/privacy
+YouTube Terms of Service: https://www.youtube.com/t/terms
+LinkedIn Developer Portal: https://www.linkedin.com/developers/apps
+Meta for Developers: https://developers.facebook.com/apps
+X (Twitter) Developer Portal: https://developer.x.com/en/portal/dashboard
+Twitch Developer Console: https://dev.twitch.tv/console/apps
+GitHub Repository: https://github.com/Naveen29S/StreamSyncApp
+Supabase Dashboard: https://supabase.com/dashboard/project/dqyqczyqraddbmexnifi
