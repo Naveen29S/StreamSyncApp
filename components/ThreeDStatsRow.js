@@ -248,39 +248,11 @@ export default function ThreeDStatsRow({
 
   return (
     <View style={styles.container}>
-      {/* Clean Controls Header */}
-      <View style={styles.hudBar}>
-        <View style={styles.hudLeft}>
-          <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>
-            Overview Telemetry • Tap any card to flip platform
-          </Text>
-        </View>
-
-        <View style={styles.hudRight}>
-          <TouchableOpacity
-            onPress={() => setIsAutoRotate(!isAutoRotate)}
-            style={[
-              styles.ctrlBtn,
-              {
-                backgroundColor: isAutoRotate 
-                  ? (isDark ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)')
-                  : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
-                borderColor: isAutoRotate ? '#6366f1' : colors.border
-              }
-            ]}
-          >
-            <Text style={[styles.ctrlBtnText, { color: isAutoRotate ? '#818cf8' : colors.textSecondary }]}>
-              {isAutoRotate ? '❚❚ AUTO-ROLL ON' : '▶ AUTO-ROLL'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 3D Model Prism Cards Row (Staggered Wave Animation) */}
+      {/* First Row Stat Cards (Unified Dashboard Design) */}
       <View style={styles.cardsRow}>
         {/* Card 1: Total Reach */}
         <ThreeDStatCard
-          title="Total Reach"
+          title="30-Day Reach"
           metricType="reach"
           surfaces={reachSurfaces}
           staggerDelay={0}

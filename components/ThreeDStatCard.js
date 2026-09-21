@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 /**
- * ThreeDStatCard (Option A - Native CSS 3D Transforms)
- * Renders an ultra-crisp, hardware-accelerated 3D geometric prism using native CSS3 3D transforms.
- * Delivers 100% native font sharpness, high contrast, and smooth upward rolling on click.
+ * ThreeDStatCard (Dashboard Unified Design)
+ * Matches the exact visual styling, dark-mode materials, hover lift animation,
+ * and sleek typography of the Platform Performance cards in the StreamSync dashboard.
  */
 export default function ThreeDStatCard({
   title = '',
@@ -20,6 +20,7 @@ export default function ThreeDStatCard({
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
 
   // Safe fallback if surfaces is empty
   const safeSurfaces = useMemo(() => {
@@ -37,22 +38,32 @@ export default function ThreeDStatCard({
     ];
   }, [surfaces, title]);
 
-  const N = Math.max(3, safeSurfaces.length);
-  const facetHeight = 170;
-  // Incircle radius for regular polygon: R = (facetHeight / 2) / tan(PI / N)
-  const R = Math.round((facetHeight / 2) / Math.tan(Math.PI / N));
-  const angleStep = 360 / N;
-
   const flipUpward = () => {
-    setCurrentIndex(prev => {
-      const next = (prev + 1) % safeSurfaces.length;
-      if (onSurfaceChange) onSurfaceChange(next);
-      return next;
-    });
+    if (isFlipping) return;
+    setIsFlipping(true);
+    setTimeout(() => {
+      setCurrentIndex(prev => {
+        const next = (prev + 1) % safeSurfaces.length;
+        if (onSurfaceChange) onSurfaceChange(next);
+        return next;
+      });
+      setIsFlipping(false);
+    }, 160);
   };
 
   const activeSurface = safeSurfaces[currentIndex % safeSurfaces.length] || safeSurfaces[0];
-  const currentRotationDeg = -currentIndex * angleStep;
+
+  const PLATFORM_LOGOS = {
+    'all': null,
+    'yt': 'https://img.icons8.com/color/512/youtube-play.png',
+    'ig': 'https://img.icons8.com/fluent/512/instagram-new.png',
+    'x': 'https://img.icons8.com/ios-filled/512/twitterx--v1.png',
+    'twitch': 'https://img.icons8.com/color/512/twitch--v1.png',
+    'fb': 'https://img.icons8.com/color/512/facebook-new.png',
+    'in': 'https://img.icons8.com/color/512/linkedin.png'
+  };
+
+  const logoUrl = PLATFORM_LOGOS[activeSurface.platformKey] || null;
 
   if (Platform.OS === 'web') {
     return (
@@ -63,193 +74,160 @@ export default function ThreeDStatCard({
         style={{
           flex: '1 1 240px',
           minWidth: 240,
-          height: facetHeight,
-          perspective: 1100,
+          borderRadius: 20,
+          backgroundColor: colors.cardBg || (isDark ? '#0c1424' : '#ffffff'),
+          border: isDark 
+            ? `1px solid ${isHovered ? activeSurface.brandColor : 'rgba(255, 255, 255, 0.08)'}` 
+            : `1px solid ${isHovered ? activeSurface.brandColor : colors.border || '#f0f0f0'}`,
+          borderTop: `3px solid ${activeSurface.brandColor}`,
+          boxShadow: isDark
+            ? (isHovered 
+                ? `0 16px 40px rgba(0, 0, 0, 0.65), 0 0 20px ${activeSurface.brandColor}35` 
+                : '0 8px 30px rgba(0, 0, 0, 0.55)')
+            : (isHovered 
+                ? `0 16px 36px ${activeSurface.brandColor}20` 
+                : '0px 8px 24px rgba(0, 0, 0, 0.04)'),
+          transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+          transition: 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease',
           cursor: 'pointer',
           userSelect: 'none',
           WebkitUserSelect: 'none',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
           position: 'relative',
+          overflow: 'hidden',
+          minHeight: 175,
         }}
       >
-        {/* 3D Prism Rotator */}
+        {/* Animated Card Content */}
         <div
           style={{
-            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
             height: '100%',
-            position: 'relative',
-            transformStyle: 'preserve-3d',
-            WebkitTransformStyle: 'preserve-3d',
-            transform: `translateZ(-${R}px) rotateX(${currentRotationDeg}deg)`,
-            transition: 'transform 0.65s cubic-bezier(0.2, 0.9, 0.3, 1.15)',
-            boxSizing: 'border-box',
+            opacity: isFlipping ? 0.2 : 1,
+            transform: isFlipping ? 'translateY(-8px)' : 'translateY(0)',
+            transition: 'opacity 0.16s ease, transform 0.16s ease',
           }}
         >
-          {safeSurfaces.map((surf, idx) => {
-            const angleDeg = idx * angleStep;
-            const isFront = idx === (currentIndex % safeSurfaces.length);
+          {/* Top Row: Metric Label & Platform Brand Pill */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: isDark ? '#94a3b8' : '#64748b',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {activeSurface.label || title}
+            </span>
 
-            return (
-              <div
-                key={idx}
+            {/* Platform Badge matching Dashboard performance pills */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 10px',
+                borderRadius: 12,
+                backgroundColor: activeSurface.brandBg || 'rgba(99, 102, 241, 0.15)',
+                border: `1px solid ${activeSurface.brandColor}40`,
+              }}
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />
+              ) : (
+                <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: activeSurface.brandColor }} />
+              )}
+              <span
                 style={{
-                  position: 'absolute',
-                  width: '100%',
-                  height: facetHeight,
-                  top: 0,
-                  left: 0,
-                  transform: `rotateX(${angleDeg}deg) translateZ(${R}px)`,
-                  WebkitTransform: `rotateX(${angleDeg}deg) translateZ(${R}px)`,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  borderRadius: 16,
-                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                  border: isDark 
-                    ? `1.5px solid ${isHovered && isFront ? surf.brandColor : 'rgba(255, 255, 255, 0.1)'}` 
-                    : `1.5px solid ${isHovered && isFront ? surf.brandColor : 'rgba(0, 0, 0, 0.08)'}`,
-                  boxShadow: isDark 
-                    ? (isFront ? `0 8px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08)` : 'none')
-                    : (isFront ? `0 8px 24px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9)` : 'none'),
-                  padding: '20px 22px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxSizing: 'border-box',
-                  overflow: 'hidden',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: activeSurface.brandColor,
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
-                {/* Top Brand Accent Line */}
+                {activeSurface.platformName}
+              </span>
+            </div>
+          </div>
+
+          {/* Center: Large Numerical Value */}
+          <div style={{ margin: '4px 0' }}>
+            <div
+              style={{
+                fontSize: String(activeSurface.value ?? '0').length > 10 ? 28 : 34,
+                fontWeight: 800,
+                color: isDark ? '#ffffff' : '#0f172a',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.1,
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {activeSurface.value ?? '0'}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: isDark ? '#64748b' : '#94a3b8',
+                marginTop: 4,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {activeSurface.caption}
+            </div>
+          </div>
+
+          {/* Bottom Row: Trend & Platform Pagination Indicator */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: 8 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              ↑ {activeSurface.trend || 'Live'}
+            </span>
+
+            {/* Pagination Indicators matching Dashboard aesthetic */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              {safeSurfaces.map((_, dotIdx) => (
                 <div
+                  key={dotIdx}
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 20,
-                    right: 20,
-                    height: 3,
-                    background: surf.brandColor,
-                    borderRadius: '0 0 4px 4px',
-                    opacity: 0.85,
+                    width: dotIdx === (currentIndex % safeSurfaces.length) ? 14 : 5,
+                    height: 5,
+                    borderRadius: 3,
+                    backgroundColor: dotIdx === (currentIndex % safeSurfaces.length)
+                      ? activeSurface.brandColor
+                      : (isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'),
+                    transition: 'all 0.25s ease',
                   }}
                 />
-
-                {/* Top Row: Label & Platform Badge */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      color: isDark ? '#94a3b8' : '#64748b',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    {surf.label || title}
-                  </span>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '3px 10px',
-                      borderRadius: 12,
-                      backgroundColor: surf.brandBg || 'rgba(99, 102, 241, 0.15)',
-                      border: `1px solid ${surf.brandColor}40`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: surf.brandColor,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: surf.brandColor,
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      }}
-                    >
-                      {surf.platformName}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Middle: Big Value */}
-                <div style={{ margin: '6px 0 2px 0' }}>
-                  <div
-                    style={{
-                      fontSize: String(surf.value ?? '0').length > 10 ? 30 : 36,
-                      fontWeight: 800,
-                      color: isDark ? '#ffffff' : '#0f172a',
-                      letterSpacing: '-0.02em',
-                      lineHeight: 1.1,
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    {surf.value ?? '0'}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: isDark ? '#64748b' : '#94a3b8',
-                      marginTop: 4,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    {surf.caption}
-                  </div>
-                </div>
-
-                {/* Bottom Row: Trend & Platform Indicator Dots */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#10b981',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    ↑ {surf.trend || 'Live'}
-                  </span>
-
-                  {/* Surface Pagination Dots */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {safeSurfaces.map((_, dotIdx) => (
-                      <div
-                        key={dotIdx}
-                        style={{
-                          width: dotIdx === (idx % safeSurfaces.length) ? 14 : 5,
-                          height: 5,
-                          borderRadius: 3,
-                          backgroundColor: dotIdx === (idx % safeSurfaces.length)
-                            ? surf.brandColor
-                            : (isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'),
-                          transition: 'all 0.3s ease',
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Mobile Native Fallback
+  // Mobile Native
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -257,8 +235,9 @@ export default function ThreeDStatCard({
       style={[
         styles.cardContainer,
         {
-          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+          backgroundColor: colors.cardBg || (isDark ? '#0c1424' : '#ffffff'),
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : colors.border || '#f0f0f0',
+          borderTopColor: activeSurface.brandColor,
         }
       ]}
     >
@@ -301,9 +280,10 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     minWidth: 240,
-    height: 170,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    height: 175,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderTopWidth: 3,
     padding: 20,
     justifyContent: 'space-between',
   },
@@ -331,7 +311,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   value: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
