@@ -107,7 +107,7 @@ export default function ConnectsScreen() {
 
   // X (Twitter) modal states
   const [xModalVisible, setXModalVisible] = useState(false);
-  const [xUsername, setXUsername] = useState('TwitterDev');
+  const [xUsername, setXUsername] = useState('');
   const [xBearerToken, setXBearerToken] = useState('');
   const [xLoading, setXLoading] = useState(false);
   const [xModalError, setXModalError] = useState('');
@@ -351,21 +351,21 @@ export default function ConnectsScreen() {
 
       const isTwitch = platforms.includes('twitch');
       if (isTwitch) {
-        setTwitchUsername(data.api_keys.twitch_username || data.api_keys.twitch_login || 'shroud');
+        setTwitchUsername(data.api_keys.twitch_username || data.api_keys.twitch_login || '');
         setTwitchClientId(data.api_keys.twitch_client_id || '');
         setTwitchClientSecret(data.api_keys.twitch_client_secret || '');
       }
 
       const isX = platforms.includes('x');
       if (isX) {
-        const xHandle = data.api_keys.x_username || data.api_keys.twitter_username || xIdentity?.identity_data?.user_name || xIdentity?.identity_data?.preferred_username || 'naveen_2907';
+        const xHandle = data.api_keys.x_username || data.api_keys.twitter_username || xIdentity?.identity_data?.user_name || xIdentity?.identity_data?.preferred_username || '';
         setXUsername(xHandle);
         setXBearerToken(data.api_keys.x_bearer_token || data.api_keys.x || '');
       }
 
       const isIg = platforms.includes('ig');
       if (isIg) {
-        setIgUsername(data.api_keys.ig_username || data.api_keys.instagram_username || 'creators');
+        setIgUsername(data.api_keys.ig_username || data.api_keys.instagram_username || '');
         setIgAccessToken(data.api_keys.ig || data.api_keys.ig_token || '');
       }
     } else {
@@ -384,14 +384,14 @@ export default function ConnectsScreen() {
     const rawChan = apiKeys.youtube_channel_id || apiKeys.yt_channel_id || (typeof apiKeys.youtube === 'object' ? apiKeys.youtube.channelId : '') || '';
 
     setYtApiKey(rawKey);
-    setYtChannelId(rawChan || '@GoogleDevelopers');
+    setYtChannelId(rawChan || '');
     setYtModalVisible(true);
   }
 
   function openTwitchModal() {
     setTwitchModalError('');
     setTwitchModalSuccess('');
-    const rawUser = apiKeys.twitch_username || apiKeys.twitch_login || 'shroud';
+    const rawUser = apiKeys.twitch_username || apiKeys.twitch_login || '';
     const rawCId = apiKeys.twitch_client_id || '';
     const rawCSec = apiKeys.twitch_client_secret || '';
 
@@ -430,7 +430,7 @@ export default function ConnectsScreen() {
         setTwitchModalSuccess('');
       }, 1200);
     } catch (err) {
-      setTwitchModalError(err.message || 'Failed to connect Twitch channel. Please check your credentials and username.');
+      setTwitchModalError(err.message || 'Failed to connect Twitch channel.');
     } finally {
       setTwitchLoading(false);
     }
@@ -453,11 +453,6 @@ export default function ConnectsScreen() {
   async function handleDisconnectTwitch() {
     setTwitchLoading(true);
     try {
-      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, 'twitch')));
-      setTwitchUsername('');
-      setTwitchClientId('');
-      setTwitchClientSecret('');
-
       await disconnectPlatform('twitch');
       await fetchProfile(session.user.id);
       setTwitchModalVisible(false);
@@ -470,7 +465,7 @@ export default function ConnectsScreen() {
 
   function openXModal() {
     const rawKey = apiKeys.x_bearer_token || apiKeys.x || '';
-    const rawUser = apiKeys.x_username || apiKeys.twitter_username || 'TwitterDev';
+    const rawUser = apiKeys.x_username || apiKeys.twitter_username || '';
     setXBearerToken(rawKey);
     setXUsername(rawUser);
     setXModalError('');
@@ -479,8 +474,13 @@ export default function ConnectsScreen() {
   }
 
   async function handleXConnect(customToken, customUser) {
-    const tokenToUse = customToken !== undefined ? customToken : xBearerToken;
-    const userToUse = customUser !== undefined ? customUser : xUsername;
+    const tokenToUse = (customToken !== undefined ? customToken : xBearerToken).trim();
+    const userToUse = (customUser !== undefined ? customUser : xUsername).trim();
+
+    if (!userToUse) {
+      setXModalError('Please enter your X username or handle.');
+      return;
+    }
 
     setXLoading(true);
     setXModalError('');
@@ -737,7 +737,7 @@ export default function ConnectsScreen() {
       return;
     }
     if (!chanToUse) {
-      setYtModalError('Please enter a YouTube Channel Handle (e.g. @mkbhd, @GoogleDevelopers) or Channel ID (e.g. UC...).');
+      setYtModalError('Please enter your YouTube Channel Handle (e.g. @your_channel) or Channel ID (e.g. UC...).');
       return;
     }
 
@@ -1151,7 +1151,7 @@ export default function ConnectsScreen() {
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CHANNEL HANDLE OR ID *</Text>
                   <TextInput
                     style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                    placeholder="e.g. @mkbhd, @GoogleDevelopers, or UC..."
+                    placeholder="e.g. your_channel_handle or Channel ID"
                     placeholderTextColor={colors.textSecondary}
                     value={ytChannelId}
                     onChangeText={setYtChannelId}
@@ -1272,7 +1272,7 @@ export default function ConnectsScreen() {
                 <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>TWITCH USERNAME / CHANNEL HANDLE *</Text>
                 <TextInput
                   style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. shroud, ninja, or your channel"
+                  placeholder="e.g. your_twitch_channel"
                   placeholderTextColor={colors.textSecondary}
                   value={twitchUsername}
                   onChangeText={setTwitchUsername}
@@ -1442,7 +1442,7 @@ export default function ConnectsScreen() {
                 <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X USERNAME / HANDLE *</Text>
                 <TextInput
                   style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="e.g. TwitterDev, elonmusk, or your handle"
+                  placeholder="e.g. your_x_handle"
                   placeholderTextColor={colors.textSecondary}
                   value={xUsername}
                   onChangeText={setXUsername}
@@ -1589,26 +1589,13 @@ export default function ConnectsScreen() {
                 borderColor: '#6C5CE7',
                 gap: 12
               }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Feather name="at-sign" size={16} color="#6C5CE7" />
                     <Text style={{ fontSize: 12, fontWeight: '800', color: isDark ? '#c4b5fd' : '#4338ca', letterSpacing: 0.5 }}>
                       ENTER INSTAGRAM USERNAME
                     </Text>
                   </View>
-                  <TouchableOpacity 
-                    onPress={() => setIgUsername('creators')}
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 6,
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: isDark ? '#a5b4fc' : '#4f46e5', fontWeight: '600' }}>
-                      Demo: @creators
-                    </Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* Explicit Text Box with @ Icon */}
@@ -1641,7 +1628,7 @@ export default function ConnectsScreen() {
                       backgroundColor: 'transparent',
                       ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {})
                     }}
-                    placeholder="your_handle (e.g. creators or yourname)"
+                    placeholder="e.g. your_instagram_handle"
                     placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
                     value={igUsername}
                     onChangeText={(text) => {

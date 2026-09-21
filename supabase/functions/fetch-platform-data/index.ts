@@ -49,7 +49,7 @@ serve(async (req) => {
         
         // Fix: ya29 tokens are OAuth Bearer tokens, NOT API keys
         const isOAuth = String(rawKeyOrToken).startsWith('ya29.') || Boolean(typeof ytKeyEntry === 'object' && ytKeyEntry.token) || Boolean(apiKeys['youtube_token'] && rawKeyOrToken === apiKeys['youtube_token']);
-        const isApiKey = !isOAuth && (String(rawKeyOrToken).startsWith('AIza') || rawKeyOrToken === 'DEMO' || Boolean(channelId));
+        const isApiKey = !isOAuth && (String(rawKeyOrToken).startsWith('AIza') || Boolean(channelId));
 
         let channelData: any = null;
 
@@ -340,9 +340,7 @@ serve(async (req) => {
     if ((platformsToUpdate.includes('x') || platformsToUpdate.includes('x (twitter)')) && (apiKeys['x'] || apiKeys['x_bearer_token'])) {
       try {
         const token = apiKeys['x'] || apiKeys['x_bearer_token'];
-        if (token === 'DEMO') {
-          console.log("X in DEMO mode - client synced.");
-        } else {
+        if (token && token !== 'DEMO') {
           const xUser = apiKeys['x_username'] || apiKeys['twitter_username'];
           const userUrl = xUser
             ? `https://api.twitter.com/2/users/by/username/${encodeURIComponent(xUser.replace(/^@/, ''))}?user.fields=public_metrics`

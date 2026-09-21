@@ -33,7 +33,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/color/512/youtube-play.png',
     portalUrl: 'https://console.cloud.google.com/apis/credentials',
     portalLabel: 'Google Cloud Console ↗',
-    defaultHandle: '@GoogleDevelopers',
+    defaultHandle: '',
     type: 'Video & Streaming',
     metricLabels: ['Subscribers', 'Total Views', 'Engagement', 'Est. Revenue'],
     oauthProvider: 'google',
@@ -49,7 +49,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/color/512/twitch--v1.png',
     portalUrl: 'https://dev.twitch.tv/console/apps',
     portalLabel: 'dev.twitch.tv/console ↗',
-    defaultHandle: 'shroud',
+    defaultHandle: '',
     type: 'Live Broadcasting',
     metricLabels: ['Followers', 'Total Views', 'Avg Viewers', 'Sub Revenue'],
     oauthProvider: null,
@@ -64,7 +64,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png',
     portalUrl: 'https://developer.x.com/en/portal/dashboard',
     portalLabel: 'developer.x.com ↗',
-    defaultHandle: 'TwitterDev',
+    defaultHandle: '',
     type: 'Microblogging & Threads',
     metricLabels: ['Followers', 'Impressions', 'Engagement', 'Profile Visits'],
     oauthProvider: 'x',
@@ -80,7 +80,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/fluent/512/instagram-new.png', 
     portalUrl: 'https://instagram.com', 
     portalLabel: 'instagram.com ↗', 
-    defaultHandle: 'creators', 
+    defaultHandle: '', 
     type: 'Photos, Reels & Stories', 
     metricLabels: ['Followers', 'Reel Views', 'Engagement', 'Reach Growth'], 
     oauthProvider: null, 
@@ -96,7 +96,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/color/512/facebook-new.png',
     portalUrl: 'https://developers.facebook.com/apps',
     portalLabel: 'developers.facebook.com ↗',
-    defaultHandle: 'Meta',
+    defaultHandle: '',
     type: 'Pages & Social Network',
     metricLabels: ['Page Followers', 'Video Views', 'Engagement', 'Ad Revenue'],
     oauthProvider: 'facebook',
@@ -112,7 +112,7 @@ export const PLATFORMS_CONFIG = {
     logo: 'https://img.icons8.com/color/512/linkedin.png',
     portalUrl: 'https://www.linkedin.com/developers/apps',
     portalLabel: 'linkedin.com/developers ↗',
-    defaultHandle: 'google',
+    defaultHandle: '',
     type: 'Professional Network',
     metricLabels: ['Connections', 'Impressions', 'Engagement', 'Follower Growth'],
     oauthProvider: 'linkedin_oidc',
@@ -142,7 +142,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [ytModalSuccess, setYtModalSuccess] = useState('');
 
   // Twitch modal states
-  const [twitchUsername, setTwitchUsername] = useState('shroud');
+  const [twitchUsername, setTwitchUsername] = useState('');
   const [twitchClientId, setTwitchClientId] = useState('');
   const [twitchClientSecret, setTwitchClientSecret] = useState('');
   const [twitchLoading, setTwitchLoading] = useState(false);
@@ -150,7 +150,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [twitchModalSuccess, setTwitchModalSuccess] = useState('');
 
   // X (Twitter) modal states
-  const [xUsername, setXUsername] = useState('TwitterDev');
+  const [xUsername, setXUsername] = useState('');
   const [xBearerToken, setXBearerToken] = useState('');
   const [xLoading, setXLoading] = useState(false);
   const [xModalError, setXModalError] = useState('');
@@ -166,14 +166,14 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   const [igModalSuccess, setIgModalSuccess] = useState('');
 
   // Facebook modal states
-  const [fbPageName, setFbPageName] = useState('Meta');
+  const [fbPageName, setFbPageName] = useState('');
   const [fbAccessToken, setFbAccessToken] = useState('');
   const [fbLoading, setFbLoading] = useState(false);
   const [fbModalError, setFbModalError] = useState('');
   const [fbModalSuccess, setFbModalSuccess] = useState('');
 
   // LinkedIn modal states
-  const [inProfileName, setInProfileName] = useState('google');
+  const [inProfileName, setInProfileName] = useState('');
   const [inAccessToken, setInAccessToken] = useState('');
   const [inLoading, setInLoading] = useState(false);
   const [inModalError, setInModalError] = useState('');
@@ -315,17 +315,17 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
   // Identifier handle
   let channelHandle = '';
   if (pKey === 'yt') {
-    channelHandle = apiKeys.youtube_channel_title || apiKeys.youtube_channel_id || '@GoogleDevelopers';
+    channelHandle = apiKeys.youtube_channel_title || apiKeys.youtube_channel_id || '';
   } else if (pKey === 'twitch') {
-    channelHandle = apiKeys.twitch_channel_title || apiKeys.twitch_username || 'shroud';
+    channelHandle = apiKeys.twitch_channel_title || apiKeys.twitch_username || '';
   } else if (pKey === 'x') {
-    channelHandle = apiKeys.x_username ? `@${apiKeys.x_username.replace(/^@/, '')}` : '@TwitterDev';
+    channelHandle = apiKeys.x_username ? `@${apiKeys.x_username.replace(/^@/, '')}` : '';
   } else if (pKey === 'ig') {
-    channelHandle = apiKeys.ig_username ? `@${apiKeys.ig_username.replace(/^@/, '')}` : '@creators';
+    channelHandle = apiKeys.ig_username ? `@${apiKeys.ig_username.replace(/^@/, '')}` : '';
   } else if (pKey === 'fb') {
-    channelHandle = apiKeys.fb_page || 'Meta';
+    channelHandle = apiKeys.fb_page || '';
   } else if (pKey === 'in') {
-    channelHandle = apiKeys.in_profile ? `@${apiKeys.in_profile.replace(/^@/, '')}` : '@google';
+    channelHandle = apiKeys.in_profile ? `@${apiKeys.in_profile.replace(/^@/, '')}` : '';
   }
 
   // Profile URL
@@ -407,12 +407,17 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     const tokenToUse = (customToken !== undefined ? customToken : xBearerToken).trim();
     const userToUse = (customUser !== undefined ? customUser : xUsername).trim();
 
+    if (!userToUse) {
+      setXModalError('Please enter your X username or handle.');
+      return;
+    }
+
     setXLoading(true);
     setXModalError('');
     setXModalSuccess('');
     try {
-      await connectXViaApiKey(tokenToUse, userToUse || 'TwitterDev');
-      setXModalSuccess(`Connected @${(userToUse || 'TwitterDev').replace(/^@/, '')} successfully!`);
+      await connectXViaApiKey(tokenToUse, userToUse);
+      setXModalSuccess(`Connected @${userToUse.replace(/^@/, '')} successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
@@ -589,12 +594,17 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     const tokenToUse = (customToken !== undefined ? customToken : fbAccessToken).trim();
     const pageToUse = (customPage !== undefined ? customPage : fbPageName).trim();
 
+    if (!pageToUse) {
+      setFbModalError('Please enter your Facebook page name or ID.');
+      return;
+    }
+
     setFbLoading(true);
     setFbModalError('');
     setFbModalSuccess('');
     try {
-      const data = await connectFacebookViaApiKey(pageToUse || 'Meta', tokenToUse);
-      setFbModalSuccess(`Connected "${pageToUse || 'Meta'}" page successfully!`);
+      const data = await connectFacebookViaApiKey(pageToUse, tokenToUse);
+      setFbModalSuccess(`Connected "${pageToUse}" page successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
@@ -613,12 +623,17 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
     const tokenToUse = (customToken !== undefined ? customToken : inAccessToken).trim();
     const profileToUse = (customProfile !== undefined ? customProfile : inProfileName).trim();
 
+    if (!profileToUse) {
+      setInModalError('Please enter your LinkedIn profile or company handle.');
+      return;
+    }
+
     setInLoading(true);
     setInModalError('');
     setInModalSuccess('');
     try {
-      const data = await connectLinkedInViaApiKey(profileToUse || 'google', tokenToUse);
-      setInModalSuccess(`Connected "${profileToUse || 'google'}" successfully!`);
+      const data = await connectLinkedInViaApiKey(profileToUse, tokenToUse);
+      setInModalSuccess(`Connected "${profileToUse}" successfully!`);
       await loadData();
       if (onSuccess) await onSuccess();
       setTimeout(() => {
@@ -1076,7 +1091,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                           <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>CHANNEL HANDLE OR ID *</Text>
                           <TextInput
                             style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                            placeholder="e.g. @mkbhd, @GoogleDevelopers, or UC..."
+                            placeholder="e.g. your_channel_handle or Channel ID"
                             placeholderTextColor={colors.textSecondary}
                             value={ytChannelId}
                             onChangeText={setYtChannelId}
@@ -1125,7 +1140,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>TWITCH CHANNEL USERNAME *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. shroud, ninja, or your channel"
+                        placeholder="e.g. your_twitch_channel"
                         placeholderTextColor={colors.textSecondary}
                         value={twitchUsername}
                         onChangeText={setTwitchUsername}
@@ -1221,7 +1236,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>X (TWITTER) USERNAME / HANDLE *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. TwitterDev, elonmusk, or your handle"
+                        placeholder="e.g. your_x_handle"
                         placeholderTextColor={colors.textSecondary}
                         value={xUsername}
                         onChangeText={setXUsername}
@@ -1302,26 +1317,11 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       borderColor: '#6C5CE7',
                       gap: 12
                     }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Feather name="at-sign" size={16} color="#6C5CE7" />
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: isDark ? '#c4b5fd' : '#4338ca', letterSpacing: 0.5 }}>
-                            ENTER INSTAGRAM USERNAME
-                          </Text>
-                        </View>
-                        <TouchableOpacity 
-                          onPress={() => setIgUsername('creators')}
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 6,
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, color: isDark ? '#a5b4fc' : '#4f46e5', fontWeight: '600' }}>
-                            Demo: @creators
-                          </Text>
-                        </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Feather name="at-sign" size={16} color="#6C5CE7" />
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: isDark ? '#c4b5fd' : '#4338ca', letterSpacing: 0.5 }}>
+                          ENTER INSTAGRAM USERNAME
+                        </Text>
                       </View>
 
                       {/* Explicit Text Box with @ Icon */}
@@ -1354,7 +1354,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                             backgroundColor: 'transparent',
                             ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {})
                           }}
-                          placeholder="your_handle (e.g. creators or yourname)"
+                          placeholder="e.g. your_instagram_handle"
                           placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
                           value={igUsername}
                           onChangeText={(text) => {
@@ -1527,7 +1527,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>FACEBOOK PAGE NAME OR ID *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. Meta, StreamSync, or your page name"
+                        placeholder="e.g. your_facebook_page_name or ID"
                         placeholderTextColor={colors.textSecondary}
                         value={fbPageName}
                         onChangeText={setFbPageName}
@@ -1608,7 +1608,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
                       <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN PROFILE OR COMPANY HANDLE *</Text>
                       <TextInput
                         style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
-                        placeholder="e.g. google, microsoft, or your profile handle"
+                        placeholder="e.g. your_profile_or_company_handle"
                         placeholderTextColor={colors.textSecondary}
                         value={inProfileName}
                         onChangeText={setInProfileName}
