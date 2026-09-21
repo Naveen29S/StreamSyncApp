@@ -94,15 +94,18 @@ export default function AnalyticsScreen() {
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const router = useRouter();
 
-  // Platform Preview selection & auto-cycle rotation state
+  // Platform selection state (clean manual switching, zero auto-rotation)
   const [selectedPlatformKey, setSelectedPlatformKey] = useState('all');
-  const [autoCycle, setAutoCycle] = useState(true);
-  const [cycleProgress, setCycleProgress] = useState(0);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent && !data) {
+      setLoading(true);
+    }
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      setLoading(false);
+      return;
+    }
     
     const { data: profile } = await supabase
       .from('profiles')
@@ -174,11 +177,11 @@ export default function AnalyticsScreen() {
     let isMounted = true;
     let subscription = null;
 
-    loadData();
+    loadData(false);
 
-    // Subscribe to real-time manual or frequent auto refreshes
+    // Subscribe to real-time manual or frequent auto refreshes (silently in background)
     const unregisterRefresh = registerRefreshListener(async () => {
-      if (isMounted) await loadData();
+      if (isMounted) await loadData(true);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -187,16 +190,16 @@ export default function AnalyticsScreen() {
       const channelName = `analytics-changes-${session.user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const channel = supabase.channel(channelName)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` }, () => {
-          if (isMounted) loadData();
+          if (isMounted) loadData(true);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics', filter: `user_id=eq.${session.user.id}` }, () => {
-          if (isMounted) loadData();
+          if (isMounted) loadData(true);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'content', filter: `user_id=eq.${session.user.id}` }, () => {
-          if (isMounted) loadData();
+          if (isMounted) loadData(true);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'comments', filter: `user_id=eq.${session.user.id}` }, () => {
-          if (isMounted) loadData();
+          if (isMounted) loadData(true);
         });
 
       if (!isMounted) {
@@ -218,39 +221,11 @@ export default function AnalyticsScreen() {
     };
   }, [timeframe]);
 
-  // ─── Auto-Cycle Timer Engine ───
-  useEffect(() => {
-    if (!autoCycle) return;
-
-    const timer = setInterval(() => {
-      setCycleProgress(prev => {
-        if (prev >= 1) {
-          // Time expired for this platform, rotate to the next one
-          setSelectedPlatformKey(currKey => {
-            const currIdx = PLATFORM_PREVIEWS.findIndex(p => p.key === currKey);
-            const nextIdx = (currIdx + 1) % PLATFORM_PREVIEWS.length;
-            return PLATFORM_PREVIEWS[nextIdx].key;
-          });
-          return 0;
-        }
-        return prev + (TICK_MS / CYCLE_INTERVAL_MS);
-      });
-    }, TICK_MS);
-
-    return () => clearInterval(timer);
-  }, [autoCycle]);
-
   const handleSelectPlatform = (key) => {
     setSelectedPlatformKey(key);
-    setCycleProgress(0);
   };
 
-  const toggleAutoCycle = () => {
-    setAutoCycle(prev => !prev);
-    setCycleProgress(0);
-  };
-
-  if (loading) {
+  if (loading && !data) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bodyBg }]}>
         <ActivityIndicator size="large" color={colors.accent} />
@@ -381,44 +356,21 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      {/* ─── Platform Preview Buttons & Auto-Cycle Bar ─── */}
+      {/* ─── Platform Selector Bar ─── */}
       <View style={[styles.previewBarSection, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
         <View style={styles.previewBarHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Feather name="tv" size={16} color={currentPreview.color} />
-            <Text style={[styles.previewSectionTitle, { color: colors.textPrimary }]}>Platform Analytics Preview</Text>
+            <Feather name="layers" size={16} color={currentPreview.color} />
+            <Text style={[styles.previewSectionTitle, { color: colors.textPrimary }]}>Platform Analytics Filter</Text>
             <View style={[styles.activePill, { backgroundColor: currentPreview.bg, borderColor: currentPreview.color, borderWidth: 1 }]}>
               <Text style={[styles.activePillText, { color: currentPreview.color }]}>
                 {currentPreview.name}
               </Text>
             </View>
           </View>
-
-          {/* Auto-Cycle Controls */}
-          <View style={styles.autoCycleControls}>
-            <TouchableOpacity 
-              onPress={toggleAutoCycle}
-              activeOpacity={0.8}
-              style={[
-                styles.autoCycleToggleBtn, 
-                { 
-                  backgroundColor: autoCycle ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5') : colors.badgeBg,
-                  borderColor: autoCycle ? '#10b981' : colors.border
-                }
-              ]}
-            >
-              <Feather name={autoCycle ? "pause" : "play"} size={13} color={autoCycle ? '#10b981' : colors.textSecondary} />
-              <Text style={[styles.autoCycleText, { color: autoCycle ? '#10b981' : colors.textSecondary }]}>
-                {autoCycle ? "Auto-Rotating (6s)" : "Rotation Paused"}
-              </Text>
-              {autoCycle && (
-                <View style={styles.pulsingDot} />
-              )}
-            </TouchableOpacity>
-          </View>
         </View>
 
-        {/* Horizontal Platform Preview Buttons */}
+        {/* Horizontal Platform Filter Buttons */}
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
@@ -493,21 +445,6 @@ export default function AnalyticsScreen() {
                     </Text>
                   </View>
                 </View>
-
-                {/* Progress bar under the active button when auto-cycling */}
-                {isSelected && autoCycle && (
-                  <View style={styles.previewProgressTrack}>
-                    <View 
-                      style={[
-                        styles.previewProgressFill, 
-                        { 
-                          width: `${Math.min(100, Math.round(cycleProgress * 100))}%`,
-                          backgroundColor: plat.color 
-                        }
-                      ]} 
-                    />
-                  </View>
-                )}
               </TouchableOpacity>
             );
           })}
