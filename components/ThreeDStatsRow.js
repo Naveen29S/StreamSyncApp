@@ -80,6 +80,7 @@ export default function ThreeDStatsRow({
   colors = {},
   isDark = true,
   intervalMs = 4500,
+  profileApiKeys = {},
 }) {
   const [isAutoRotate, setIsAutoRotate] = useState(false);
   const [activePlatformIndex, setActivePlatformIndex] = useState(0);
@@ -191,47 +192,59 @@ export default function ThreeDStatsRow({
         pRevStr = 'Unmonetized';
       }
 
+      // Extract handle for this platform
+      let rawHandle = pStats.username || pStats.cleanHandle || '';
+      if (!rawHandle && profileApiKeys) {
+        if (key === 'in') rawHandle = profileApiKeys.in_username || profileApiKeys.in_profile || profileApiKeys.in_title || profileApiKeys.linkedin_username;
+        else if (key === 'yt') rawHandle = profileApiKeys.youtube_channel_title || profileApiKeys.youtube_handle || profileApiKeys.youtube_channel_id;
+        else if (key === 'ig') rawHandle = profileApiKeys.ig_username || profileApiKeys.instagram_username;
+        else if (key === 'x') rawHandle = profileApiKeys.x_username || profileApiKeys.twitter_username;
+        else if (key === 'twitch') rawHandle = profileApiKeys.twitch_username || profileApiKeys.twitch_channel_title;
+        else if (key === 'fb') rawHandle = profileApiKeys.fb_page;
+      }
+      const handleTag = rawHandle ? `@${String(rawHandle).replace(/^@/, '')}` : '';
+
       reach.push({
-        platformName: meta.name,
+        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Reach`,
+        label: handleTag ? `${handleTag} Reach` : `${meta.name} Reach`,
         value: pViews,
-        caption: meta.captionReach,
+        caption: handleTag ? `${handleTag} • ${meta.captionReach}` : meta.captionReach,
         trend: pViews !== '0' ? 'Live 30d' : 'Connected',
       });
 
       audience.push({
-        platformName: meta.name,
+        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Audience`,
+        label: handleTag ? `${handleTag} Audience` : `${meta.name} Audience`,
         value: pFollowers,
-        caption: meta.captionAudience,
+        caption: handleTag ? `${handleTag} • ${meta.captionAudience}` : meta.captionAudience,
         trend: pFollowers !== '0' ? 'Active' : 'Connected',
       });
 
       engagement.push({
-        platformName: meta.name,
+        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Engage`,
+        label: handleTag ? `${handleTag} Engage` : `${meta.name} Engage`,
         value: pEngage,
-        caption: meta.captionEngage,
+        caption: handleTag ? `${handleTag} • ${meta.captionEngage}` : meta.captionEngage,
         trend: parseFloat(pEngage || 0) > 0 ? 'Live Rate' : 'Tracked',
       });
 
       revenue.push({
-        platformName: meta.name,
+        platformName: handleTag ? `${meta.name} (${handleTag})` : meta.name,
         platformKey: key,
         brandColor: meta.color,
         brandBg: meta.bg,
-        label: `${meta.name} Value`,
+        label: handleTag ? `${handleTag} Value` : `${meta.name} Value`,
         value: pRevStr,
-        caption: meta.captionRevenue,
+        caption: handleTag ? `${handleTag} • ${meta.captionRevenue}` : meta.captionRevenue,
         trend: 'Est. Run-Rate',
       });
     });

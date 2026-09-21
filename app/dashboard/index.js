@@ -277,6 +277,7 @@ export default function DashboardIndex() {
         connectedPlatforms={connectedPlatforms} 
         colors={colors} 
         isDark={isDark} 
+        profileApiKeys={profileApiKeys}
       />
 
       {/* ─── Platform Breakdown Cards ─── */}
@@ -296,11 +297,14 @@ export default function DashboardIndex() {
           let statusText = 'Not connected';
           let dotStyle = styles.statusDotOff;
           
+          let handle = null;
           if (isConnected) {
-            const handle = pKey === 'in' ? (profileApiKeys.in_username || profileApiKeys.in_profile || profileApiKeys.in_title)
-              : pKey === 'ig' ? (profileApiKeys.ig_username || profileApiKeys.instagram_username)
-              : pKey === 'x' ? (profileApiKeys.x_username || profileApiKeys.twitter_username)
-              : pKey === 'yt' ? (profileApiKeys.youtube_channel_title || profileApiKeys.youtube_channel_id || profileApiKeys.youtube_handle)
+            handle = pKey === 'in' ? (profileApiKeys.in_username || profileApiKeys.in_profile || profileApiKeys.in_title || profileApiKeys.linkedin_username || stats?.username || stats?.cleanHandle)
+              : pKey === 'ig' ? (profileApiKeys.ig_username || profileApiKeys.instagram_username || stats?.username)
+              : pKey === 'x' ? (profileApiKeys.x_username || profileApiKeys.twitter_username || stats?.username)
+              : pKey === 'yt' ? (profileApiKeys.youtube_channel_title || profileApiKeys.youtube_channel_id || profileApiKeys.youtube_handle || stats?.username)
+              : pKey === 'twitch' ? (profileApiKeys.twitch_username || profileApiKeys.twitch_channel_title || profileApiKeys.twitch_login || stats?.username)
+              : pKey === 'fb' ? (profileApiKeys.fb_page || stats?.username)
               : null;
 
             if (hasApiData) {
@@ -334,7 +338,23 @@ export default function DashboardIndex() {
                   <Image source={{ uri: config.logo }} style={{ width: 22, height: 22 }} resizeMode="contain" />
                 </View>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={[styles.platformCardName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
+                    {isConnected && handle ? (
+                      <View style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.08)',
+                        borderWidth: 1,
+                        borderColor: isDark ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.2)',
+                      }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: config.color || '#6366f1' }} numberOfLines={1}>
+                          @{String(handle).replace(/^@/, '')}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={[styles.platformCardSyncTime, { color: colors.textSecondary }]} numberOfLines={2}>{statusText}</Text>
                 </View>
                 
