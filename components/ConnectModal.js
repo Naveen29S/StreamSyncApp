@@ -204,34 +204,7 @@ export default function ConnectModal({ visible, onClose, initialPlatform = 'YouT
       'linkedin_oidc': 'in', 
       'linkedin': 'in' 
     };
-    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
-
-    const keys = profile?.api_keys || {};
-    const keyPlatforms = [];
-    if (keys.youtube || keys.yt || keys.youtube_channel_id || keys.youtube_token) keyPlatforms.push('yt');
-    if (keys.twitch || keys.twitch_username || keys.twitch_login || keys.twitch_channel_id) keyPlatforms.push('twitch');
-    if (keys.x || keys.x_username || keys.twitter_username || keys.twitter || keys.x_bearer_token) keyPlatforms.push('x');
-    if (keys.ig || keys.ig_username || keys.instagram_username || keys.ig_token) keyPlatforms.push('ig');
-    if (keys.fb || keys.fb_page || keys.facebook_page || keys.fb_token) keyPlatforms.push('fb');
-    if (keys.in || keys.in_profile || keys.linkedin_profile || keys.in_token) keyPlatforms.push('in');
-
-    const [anRes, contentRes] = await Promise.all([
-      supabase.from('analytics').select('platform, total_followers, total_views, engagement_rate, estimated_revenue').eq('user_id', currentSession.user.id),
-      supabase.from('content').select('id, title, platform, views, engagement, thumbnail_url, published_at').eq('user_id', currentSession.user.id).order('views', { ascending: false }).limit(20)
-    ]);
-
-    const anRows = anRes.data || [];
-    setDbAnalytics(anRows);
-    setDbContent(contentRes.data || []);
-
-    const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
-
-    const rawList = [
-      ...(profile?.connected_platforms || []),
-      ...identityPlatforms,
-      ...keyPlatforms,
-      ...anPlatforms
-    ];
+    const rawList = profile?.connected_platforms || [];
     const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     setConnectedPlatforms(platforms);
 

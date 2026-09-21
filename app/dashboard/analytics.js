@@ -113,54 +113,7 @@ export default function AnalyticsScreen() {
       .eq('id', session.user.id)
       .maybeSingle();
 
-    const identities = session.user?.identities || [];
-    const providerToPlatformMap = { 
-      'google': 'yt', 
-      'facebook': 'fb', 
-      'twitter': 'x', 
-      'x': 'x', 
-      'linkedin_oidc': 'in', 
-      'linkedin': 'in' 
-    };
-    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
-    const xIdentity = identities.find(id => id.provider === 'x' || id.provider === 'twitter');
-    if (xIdentity) {
-      identityPlatforms.push('x');
-    }
-
-    const profileKeys = profile?.api_keys || {};
-    const keyPlatforms = [];
-    if (profileKeys.youtube || profileKeys.yt || profileKeys.youtube_channel_id || profileKeys.youtube_token) {
-      keyPlatforms.push('yt');
-    }
-    if (profileKeys.twitch || profileKeys.twitch_username || profileKeys.twitch_login || profileKeys.twitch_channel_id) {
-      keyPlatforms.push('twitch');
-    }
-    if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token || xIdentity) {
-      keyPlatforms.push('x');
-    }
-    if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
-      keyPlatforms.push('ig');
-    }
-    if (profileKeys.facebook || profileKeys.fb || profileKeys.fb_page || profileKeys.fb_token) {
-      keyPlatforms.push('fb');
-    }
-    if (profileKeys.linkedin || profileKeys.in || profileKeys.in_profile || profileKeys.in_token) {
-      keyPlatforms.push('in');
-    }
-
-    const { data: anRows } = await supabase
-      .from('analytics')
-      .select('platform')
-      .eq('user_id', session.user.id);
-    const anPlatforms = (anRows || []).map(r => normalizePlatformKey(r.platform)).filter(Boolean);
-
-    const rawList = [
-      ...(profile?.connected_platforms || []),
-      ...identityPlatforms,
-      ...keyPlatforms,
-      ...anPlatforms
-    ];
+    const rawList = profile?.connected_platforms || [];
     const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     setConnectedPlatforms(platforms);
     

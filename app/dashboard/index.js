@@ -81,56 +81,16 @@ export default function DashboardIndex() {
     const profile = profileRes.data;
     const anRows = anRes.data || [];
 
-    const identities = session.user?.identities || [];
-    const providerToPlatformMap = { 
-      'google': 'yt', 
-      'facebook': 'fb', 
-      'twitter': 'x', 
-      'x': 'x', 
-      'linkedin_oidc': 'in', 
-      'linkedin': 'in' 
-    };
-    const identityPlatforms = identities.map(id => providerToPlatformMap[id.provider]).filter(Boolean);
-    const xIdentity = identities.find(id => id.provider === 'x' || id.provider === 'twitter');
-    if (xIdentity) {
-      identityPlatforms.push('x');
-    }
-
     const apiKeys = profile?.api_keys || {};
     setProfileApiKeys(apiKeys);
-    const keyPlatforms = [];
-    if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
-      keyPlatforms.push('yt');
-    }
-    if (apiKeys.twitch || apiKeys.twitch_username || apiKeys.twitch_login || apiKeys.twitch_channel_id) {
-      keyPlatforms.push('twitch');
-    }
-    if (apiKeys.x || apiKeys.x_username || apiKeys.twitter_username || apiKeys.twitter || apiKeys.x_bearer_token || xIdentity) {
-      keyPlatforms.push('x');
-    }
-    if (apiKeys.instagram || apiKeys.ig || apiKeys.ig_username || apiKeys.instagram_username || apiKeys.ig_token) {
-      keyPlatforms.push('ig');
-    }
-    if (apiKeys.facebook || apiKeys.fb || apiKeys.fb_page || apiKeys.fb_token) {
-      keyPlatforms.push('fb');
-    }
-    if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token || apiKeys.in_username) {
-      keyPlatforms.push('in');
-    }
 
-    const anPlatforms = anRows.map(r => normalizePlatformKey(r.platform)).filter(Boolean);
-
-    const rawList = [
-      ...(profile?.connected_platforms || []),
-      ...identityPlatforms,
-      ...keyPlatforms,
-      ...anPlatforms
-    ];
+    // Sole source of truth: explicitly connected platforms stored on profile
+    const rawList = profile?.connected_platforms || [];
     const platforms = Array.from(new Set(rawList.map(p => normalizePlatformKey(p)).filter(Boolean)));
     
     setConnectedPlatforms(platforms);
     
-    // Fetch current DB data immediately so UI isn't blocked
+    // Fetch current DB data immediately
     const apiData = await fetchPlatformData(platforms);
     setData(apiData);
     setLoading(false);
@@ -331,7 +291,7 @@ export default function DashboardIndex() {
           const pKey = dbKeyMap[name] || normalizePlatformKey(name);
           const stats = data?.platformStats?.[name] || data?.platformStats?.[pKey];
           const hasApiData = Boolean(stats && (stats.rawFollowers !== undefined || stats.rawViews !== undefined));
-          const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, pKey)) || hasApiData;
+          const isConnected = connectedPlatforms.some(p => isPlatformMatch(p, pKey));
           
           let statusText = 'Not connected';
           let dotStyle = styles.statusDotOff;
@@ -340,11 +300,11 @@ export default function DashboardIndex() {
             const handle = pKey === 'in' ? (profileApiKeys.in_username || profileApiKeys.in_profile || profileApiKeys.in_title)
               : pKey === 'ig' ? (profileApiKeys.ig_username || profileApiKeys.instagram_username)
               : pKey === 'x' ? (profileApiKeys.x_username || profileApiKeys.twitter_username)
-              : pKey === 'yt' ? (profileApiKeys.youtube_channel_title || profileApiKeys.youtube_channel_id)
+              : pKey === 'yt' ? (profileApiKeys.youtube_channel_title || profileApiKeys.youtube_channel_id || profileApiKeys.youtube_handle)
               : null;
 
             if (hasApiData) {
-              statusText = handle ? `@${String(handle).replace(/^@/, '')} (Live)` : 'Receiving Data (Live)';
+              statusText = handle ? `@${String(handle).replace(/^@/, '')} (Live)` : 'Connected (Live)';
               dotStyle = styles.statusDotLive;
             } else {
               statusText = handle ? `@${String(handle).replace(/^@/, '')} (Ready)` : 'Connected (Sync Ready)';
@@ -712,6 +672,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.02)',
     paddingVertical: 10, borderRadius: 6, alignItems: 'center',
     borderWidth: 1, borderColor: '#eee', borderStyle: 'dashed',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   connectPlatformText: { color: '#666', fontSize: 13, fontWeight: '500' },
 
@@ -720,6 +681,7 @@ const styles = StyleSheet.create({
   tabBtn: {
     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999,
     backgroundColor: 'rgba(0,0,0,0.02)', borderWidth: 1, borderColor: '#eee',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   tabBtnActive: { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.1)' },
   tabBtnText: { fontSize: 12, color: '#666', fontWeight: '500' },
