@@ -1,22 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import * as THREE from 'three';
 
 /**
- * ThreeDStatCard (Option B)
- * Renders a futuristic 3D regular N-sided prism in Three.js WebGL.
+ * ThreeDStatCard (Option B - Three.js WebGL)
+ * Renders a futuristic 3D regular N-sided prism using Three.js WebGL.
  * Each surface represents a running platform and flips upwards on an interval.
  */
 export default function ThreeDStatCard({
   title = '',
-  metricType = 'reach', // 'reach', 'audience', 'engagement', 'revenue'
+  metricType = 'reach',
   surfaces = [],
   staggerDelay = 0,
-  intervalMs = 5000,
+  intervalMs = 4500,
   isDark = true,
   colors = {},
   isAutoRotate = true,
-  onSurfaceChange = null
+  onSurfaceChange = null,
 }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -49,133 +49,129 @@ export default function ThreeDStatCard({
     const container = containerRef.current;
     const canvas = canvasRef.current;
     let width = container.clientWidth || 280;
-    let height = container.clientHeight || 155;
+    let height = container.clientHeight || 160;
 
-    // 1. Offscreen 2D Canvas for Texture Generation
-    const texWidthPerFace = 512;
+    // 1. Generate Individual High-DPI Canvas Textures for each surface
+    const texWidth = 512;
     const texHeight = 320;
-    const offscreenCanvas = document.createElement('canvas');
-    offscreenCanvas.width = texWidthPerFace * N;
-    offscreenCanvas.height = texHeight;
-    const ctx = offscreenCanvas.getContext('2d');
+    const textures = [];
 
-    // Function to draw all N surfaces on the texture atlas
-    const drawTextureAtlas = () => {
-      ctx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    for (let i = 0; i < N; i++) {
+      const surf = safeSurfaces[i % safeSurfaces.length];
+      const faceCanvas = document.createElement('canvas');
+      faceCanvas.width = texWidth;
+      faceCanvas.height = texHeight;
+      const ctx = faceCanvas.getContext('2d');
 
-      for (let i = 0; i < N; i++) {
-        const surf = safeSurfaces[i % safeSurfaces.length];
-        const xOffset = i * texWidthPerFace;
-
-        // Card background gradient
-        const bgGrad = ctx.createLinearGradient(xOffset, 0, xOffset + texWidthPerFace, texHeight);
-        if (isDark) {
-          bgGrad.addColorStop(0, '#090d16');
-          bgGrad.addColorStop(0.5, '#0f172a');
-          bgGrad.addColorStop(1, '#1e293b');
-        } else {
-          bgGrad.addColorStop(0, '#ffffff');
-          bgGrad.addColorStop(0.7, '#f8fafc');
-          bgGrad.addColorStop(1, '#f1f5f9');
-        }
-        ctx.fillStyle = bgGrad;
-        ctx.fillRect(xOffset, 0, texWidthPerFace, texHeight);
-
-        // Futuristic cyber gridlines / accents
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(xOffset, 70);
-        ctx.lineTo(xOffset + texWidthPerFace, 70);
-        ctx.moveTo(xOffset, 240);
-        ctx.lineTo(xOffset + texWidthPerFace, 240);
-        ctx.stroke();
-
-        // Top brand accent glow line
-        const glowGrad = ctx.createLinearGradient(xOffset, 0, xOffset + texWidthPerFace, 0);
-        glowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        glowGrad.addColorStop(0.5, surf.brandColor || '#6366f1');
-        glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = glowGrad;
-        ctx.fillRect(xOffset + 40, 0, texWidthPerFace - 80, 4);
-
-        // Outer border
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(xOffset + 2, 2, texWidthPerFace - 4, texHeight - 4);
-
-        // Top Row: Metric Category Title
-        ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
-        ctx.font = 'bold 16px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText((surf.label || title).toUpperCase(), xOffset + 28, 44);
-
-        // Top Row Right: Brand Pill Badge
-        const badgeWidth = 140;
-        const badgeHeight = 28;
-        const badgeX = xOffset + texWidthPerFace - badgeWidth - 28;
-        const badgeY = 24;
-
-        ctx.fillStyle = surf.brandBg || 'rgba(99, 102, 241, 0.18)';
-        ctx.beginPath();
-        if (ctx.roundRect) {
-          ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 14);
-        } else {
-          ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
-        }
-        ctx.fill();
-
-        ctx.strokeStyle = surf.brandColor || '#6366f1';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Badge Text
-        ctx.fillStyle = surf.brandColor || '#6366f1';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(surf.platformName, badgeX + badgeWidth / 2, badgeY + 19);
-
-        // Middle: Large Bold Metric Value
-        ctx.fillStyle = isDark ? '#ffffff' : '#0f172a';
-        const valStr = String(surf.value ?? '0');
-        ctx.font = valStr.length > 10 ? 'bold 40px sans-serif' : 'bold 54px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(valStr, xOffset + 28, 155);
-
-        // Subtitle / Trend
-        ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
-        ctx.font = '14px sans-serif';
-        ctx.fillText(surf.caption || 'Live metric stream', xOffset + 28, 195);
-
-        // Bottom Trend & Pagination dots
-        ctx.fillStyle = '#10b981';
-        ctx.font = 'bold 14px monospace';
-        ctx.fillText(`↑ ${surf.trend || 'Live'}`, xOffset + 28, 280);
-
-        // Pagination Dots indicator
-        const dotsCount = safeSurfaces.length;
-        const dotRadius = 4;
-        const dotGap = 14;
-        const startDotX = xOffset + texWidthPerFace - 28 - (dotsCount * dotGap);
-        for (let d = 0; d < dotsCount; d++) {
-          ctx.beginPath();
-          ctx.arc(startDotX + (d * dotGap), 276, dotRadius, 0, Math.PI * 2);
-          ctx.fillStyle = d === i ? (surf.brandColor || '#6366f1') : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)');
-          ctx.fill();
-        }
+      // Card Background Gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, texWidth, texHeight);
+      if (isDark) {
+        bgGrad.addColorStop(0, '#0a0f1d');
+        bgGrad.addColorStop(0.5, '#0f172a');
+        bgGrad.addColorStop(1, '#1e293b');
+      } else {
+        bgGrad.addColorStop(0, '#ffffff');
+        bgGrad.addColorStop(0.6, '#f8fafc');
+        bgGrad.addColorStop(1, '#f1f5f9');
       }
-    };
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, texWidth, texHeight);
 
-    drawTextureAtlas();
+      // Cyber Gridlines / Tech Accents
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 72);
+      ctx.lineTo(texWidth, 72);
+      ctx.moveTo(0, 245);
+      ctx.lineTo(texWidth, 245);
+      ctx.stroke();
 
-    const canvasTexture = new THREE.CanvasTexture(offscreenCanvas);
-    canvasTexture.minFilter = THREE.LinearFilter;
-    canvasTexture.magFilter = THREE.LinearFilter;
+      // Top Brand Accent Line
+      const glowGrad = ctx.createLinearGradient(0, 0, texWidth, 0);
+      glowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      glowGrad.addColorStop(0.5, surf.brandColor || '#6366f1');
+      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(30, 0, texWidth - 60, 5);
+
+      // Card Border with subtle rounded bevel
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(3, 3, texWidth - 6, texHeight - 6);
+
+      // Top Header: Metric Category Title
+      ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText((surf.label || title).toUpperCase(), 32, 46);
+
+      // Top Header Right: Brand Pill Badge
+      const badgeWidth = 148;
+      const badgeHeight = 32;
+      const badgeX = texWidth - badgeWidth - 32;
+      const badgeY = 24;
+
+      ctx.fillStyle = surf.brandBg || 'rgba(99, 102, 241, 0.18)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 16);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
+      }
+      ctx.fill();
+
+      ctx.strokeStyle = surf.brandColor || '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Badge Text
+      ctx.fillStyle = surf.brandColor || '#6366f1';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(surf.platformName, badgeX + badgeWidth / 2, badgeY + 21);
+
+      // Center: Large Bold Value
+      ctx.fillStyle = isDark ? '#ffffff' : '#0f172a';
+      const valStr = String(surf.value ?? '0');
+      ctx.font = valStr.length > 9 ? 'bold 44px sans-serif' : 'bold 56px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(valStr, 32, 160);
+
+      // Caption Subtitle
+      ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
+      ctx.font = '15px sans-serif';
+      ctx.fillText(surf.caption || 'Live metric telemetry', 32, 202);
+
+      // Bottom Status / Trend
+      ctx.fillStyle = '#10b981';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(`↑ ${surf.trend || 'Live'}`, 32, 285);
+
+      // Bottom Pagination Dots
+      const dotCount = safeSurfaces.length;
+      const dotRadius = 4.5;
+      const dotGap = 15;
+      const startDotX = texWidth - 32 - (dotCount * dotGap);
+      for (let d = 0; d < dotCount; d++) {
+        ctx.beginPath();
+        ctx.arc(startDotX + (d * dotGap), 280, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = (d === (i % safeSurfaces.length))
+          ? (surf.brandColor || '#6366f1')
+          : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)');
+        ctx.fill();
+      }
+
+      const texture = new THREE.CanvasTexture(faceCanvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      textures.push(texture);
+    }
 
     // 2. Three.js Scene, Camera, Renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(0, 0, 4.4);
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 0, 4.2);
 
     let renderer;
     try {
@@ -183,21 +179,21 @@ export default function ThreeDStatCard({
         canvas: canvas,
         antialias: true,
         alpha: true,
-        powerPreference: 'high-performance'
+        powerPreference: 'high-performance',
       });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(width, height, false);
       renderer.setClearColor(0x000000, 0);
     } catch (e) {
-      console.warn("Could not create WebGLRenderer for 3D card:", e);
+      console.warn('Could not create WebGLRenderer for 3D card:', e);
       return;
     }
 
     // 3. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 1.4 : 1.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 1.5 : 1.8);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, isDark ? 0.9 : 1.2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, isDark ? 1.0 : 1.2);
     dirLight.position.set(2, 3, 5);
     scene.add(dirLight);
 
@@ -205,29 +201,33 @@ export default function ThreeDStatCard({
     pointLight.position.set(0, 0, 3.5);
     scene.add(pointLight);
 
-    // 4. Geometry: N-sided regular prism oriented horizontally along the X-axis
-    // Radius calculation so that front facet is approximately rectangular
-    const facetWidth = 3.2; // length along cylinder axis
-    const radius = 1.15;
-    const geometry = new THREE.CylinderGeometry(radius, radius, facetWidth, N, 1, false);
-    // Align cylinder along X axis so rotation around X axis revolves the facets upwards
-    geometry.rotateZ(Math.PI / 2);
+    // 4. Geometry: N-sided regular prism constructed from planar facets
+    const prismGroup = new THREE.Group();
+    scene.add(prismGroup);
 
-    // Materials: Facets use the canvas texture; Caps use metallic side cover
-    const sideMaterial = new THREE.MeshStandardMaterial({
-      map: canvasTexture,
-      roughness: isDark ? 0.25 : 0.2,
-      metalness: isDark ? 0.2 : 0.1,
-    });
+    const facetWidth = 3.3;
+    const facetHeight = 1.65;
+    // Radius of in-circle to facet centers: R = (facetHeight / 2) / tan(pi / N)
+    const R = (facetHeight / 2) / Math.tan(Math.PI / N);
 
-    const capMaterial = new THREE.MeshStandardMaterial({
-      color: isDark ? 0x0f172a : 0xe2e8f0,
-      roughness: 0.6,
-      metalness: 0.4,
-    });
+    const planeGeo = new THREE.PlaneGeometry(facetWidth, facetHeight);
 
-    const mesh = new THREE.Mesh(geometry, [sideMaterial, capMaterial, capMaterial]);
-    scene.add(mesh);
+    for (let i = 0; i < N; i++) {
+      const angle = i * ((2 * Math.PI) / N);
+      const faceMat = new THREE.MeshStandardMaterial({
+        map: textures[i],
+        roughness: isDark ? 0.25 : 0.2,
+        metalness: isDark ? 0.15 : 0.1,
+        side: THREE.FrontSide,
+      });
+
+      const faceMesh = new THREE.Mesh(planeGeo, faceMat);
+      // Place face on circumference at angle:
+      // When angle = 0, y = 0, z = R, facing positive Z (directly at camera)
+      faceMesh.position.set(0, -R * Math.sin(angle), R * Math.cos(angle));
+      faceMesh.rotation.x = angle;
+      prismGroup.add(faceMesh);
+    }
 
     // 5. Rotation Math & Upward Flipping State
     const angleStep = (2 * Math.PI) / N;
@@ -239,13 +239,13 @@ export default function ThreeDStatCard({
     let currentTiltY = 0;
     let isMouseOver = false;
 
-    // Event listeners for interactive 3D pointer tilt
+    // Interactive pointer physics
     const onMouseMove = (e) => {
       const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width; // 0 to 1
-      const y = (e.clientY - rect.top) / rect.height; // 0 to 1
-      tiltY = (x - 0.5) * 0.35; // horizontal tilt
-      tiltX = (y - 0.5) * 0.25; // vertical tilt
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      tiltY = (x - 0.5) * 0.3;
+      tiltX = (y - 0.5) * 0.2;
     };
 
     const onMouseEnter = () => {
@@ -264,7 +264,7 @@ export default function ThreeDStatCard({
     container.addEventListener('mouseenter', onMouseEnter);
     container.addEventListener('mouseleave', onMouseLeave);
 
-    // Resize Observer to handle responsive browser widths
+    // Resize Observer
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const newW = entry.contentRect.width;
@@ -280,25 +280,23 @@ export default function ThreeDStatCard({
     });
     resizeObserver.observe(container);
 
-    // 6. Upward Rotation Flip Function
+    // Upward Flip Action: Rolls the front face UPWARDS
     const flipUpward = () => {
-      // Rotating around X axis with negative delta rolls the front face UPWARDS
-      targetRotationX -= angleStep;
+      targetRotationX += angleStep;
       activeSurfaceRef.current = (activeSurfaceRef.current + 1) % safeSurfaces.length;
       setCurrentSurfaceIndex(activeSurfaceRef.current);
       if (onSurfaceChange) {
         onSurfaceChange(activeSurfaceRef.current);
       }
 
-      // Update point light color to match the incoming platform brand color
+      // Update light color to platform accent
       const incomingSurf = safeSurfaces[activeSurfaceRef.current];
       if (incomingSurf?.brandColor) {
-        const c = new THREE.Color(incomingSurf.brandColor);
-        pointLight.color = c;
+        pointLight.color = new THREE.Color(incomingSurf.brandColor);
       }
     };
 
-    // Auto-cycle timer with initial stagger delay for organic domino wave across cards
+    // Auto-cycle timer with staggered delay
     let autoFlipTimer = null;
     let staggerTimeout = null;
 
@@ -312,26 +310,23 @@ export default function ThreeDStatCard({
       }, staggerDelay);
     }
 
-    // Manual flip on click handler
     const onClick = () => {
       flipUpward();
     };
     container.addEventListener('click', onClick);
 
-    // 7. Animation Render Loop
+    // 6. Animation Render Loop
     let running = true;
     const render = () => {
       if (!running) return;
 
-      // Smooth cubic-like easing for upward roll
+      // Smooth cubic easing towards target upward angle
       currentRotationX += (targetRotationX - currentRotationX) * 0.085;
-
-      // Smooth tilt easing
       currentTiltX += (tiltX - currentTiltX) * 0.1;
       currentTiltY += (tiltY - currentTiltY) * 0.1;
 
-      mesh.rotation.x = currentRotationX + currentTiltX;
-      mesh.rotation.y = currentTiltY;
+      prismGroup.rotation.x = currentRotationX + currentTiltX;
+      prismGroup.rotation.y = currentTiltY;
 
       renderer.render(scene, camera);
       animFrameId.current = requestAnimationFrame(render);
@@ -349,54 +344,45 @@ export default function ThreeDStatCard({
       container.removeEventListener('mouseenter', onMouseEnter);
       container.removeEventListener('mouseleave', onMouseLeave);
       container.removeEventListener('click', onClick);
-
-      scene.remove(mesh);
-      geometry.dispose();
-      sideMaterial.dispose();
-      capMaterial.dispose();
-      canvasTexture.dispose();
+      textures.forEach((t) => t.dispose());
+      planeGeo.dispose();
       renderer.dispose();
     };
-  }, [N, safeSurfaces, isDark, isAutoRotate, intervalMs, staggerDelay]);
+  }, [safeSurfaces, N, isDark, isAutoRotate, intervalMs, staggerDelay]);
 
-  // Fallback rendering for non-web environments
   const activeSurface = safeSurfaces[currentSurfaceIndex] || safeSurfaces[0];
 
   return (
-    <View 
+    <View
       ref={containerRef}
       style={[
         styles.cardContainer,
         {
-          borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-          backgroundColor: isDark ? '#0b1120' : '#ffffff',
-          ...(Platform.OS === 'web' ? {
-            boxShadow: isDark 
-              ? `0 8px 32px rgba(0, 0, 0, 0.55), 0 0 24px ${activeSurface.brandColor}20` 
-              : `0 8px 24px rgba(0, 0, 0, 0.06), 0 0 20px ${activeSurface.brandColor}15`,
-            cursor: 'pointer',
-            userSelect: 'none',
-          } : {})
+          backgroundColor: isDark ? '#090d16' : '#ffffff',
+          borderColor: isHovered
+            ? (activeSurface.brandColor || '#6366f1')
+            : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'),
         }
       ]}
     >
       {Platform.OS === 'web' ? (
-        <canvas 
-          ref={canvasRef} 
-          style={{ 
-            width: '100%', 
-            height: '100%', 
-            display: 'block', 
-            borderRadius: 16 
-          }} 
+        <canvas
+          ref={canvasRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            borderRadius: 16,
+          }}
         />
       ) : (
-        // Mobile 2D Fallback
         <View style={styles.mobileFallback}>
           <View style={styles.fallbackHeader}>
             <Text style={[styles.fallbackLabel, { color: colors.textSecondary }]}>{activeSurface.label}</Text>
             <View style={[styles.fallbackPill, { backgroundColor: activeSurface.brandBg }]}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: activeSurface.brandColor }}>{activeSurface.platformName}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: activeSurface.brandColor }}>
+                {activeSurface.platformName}
+              </Text>
             </View>
           </View>
           <Text style={[styles.fallbackValue, { color: colors.textPrimary }]}>{activeSurface.value}</Text>
@@ -404,7 +390,7 @@ export default function ThreeDStatCard({
         </View>
       )}
 
-      {/* Cyberpunk corner indicator */}
+      {/* Cyberpunk corner telemetry tag */}
       <View style={styles.cornerIndicator}>
         <Text style={[styles.cornerText, { color: activeSurface.brandColor }]}>
           3D // {activeSurface.platformName.toUpperCase()}
@@ -437,7 +423,7 @@ const styles = StyleSheet.create({
     fontFamily: mono,
     fontWeight: '800',
     letterSpacing: 0.5,
-    opacity: 0.7,
+    opacity: 0.75,
   },
   mobileFallback: {
     flex: 1,

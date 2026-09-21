@@ -51,3 +51,5 @@ supabase/.temp/
 supabase/.branches/
 supabase/snippets/
 
+
+.vercel
