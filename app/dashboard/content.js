@@ -38,7 +38,7 @@ export default function ContentScreen() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
-  const filters = ['All', 'YouTube', 'Instagram', 'Twitch', 'X (Twitter)', 'Video', 'Image', 'Text'];
+  const filters = ['All', 'YouTube', 'Instagram', 'LinkedIn', 'Twitch', 'X (Twitter)', 'Video', 'Image', 'Text'];
 
   const loadContent = async () => {
     try {
@@ -203,6 +203,7 @@ export default function ContentScreen() {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'YouTube') return p.platformKey === 'yt' || p.platform === 'YouTube';
     if (activeFilter === 'Instagram') return p.platformKey === 'ig' || p.platform === 'Instagram';
+    if (activeFilter === 'LinkedIn') return p.platformKey === 'in' || p.platform === 'LinkedIn';
     if (activeFilter === 'Twitch') return p.platformKey === 'twitch' || p.platform === 'Twitch';
     if (activeFilter === 'X (Twitter)' || activeFilter === 'X') return p.platformKey === 'x' || p.platform.includes('X') || p.platform.includes('Twitter');
     if (activeFilter === 'Video') return p.type === 'Video';

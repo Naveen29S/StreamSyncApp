@@ -67,7 +67,7 @@ export default function DashboardLayout() {
       if (apiKeys.facebook || apiKeys.fb || apiKeys.fb_page || apiKeys.fb_token) {
         keyPlatforms.push('fb');
       }
-      if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token) {
+      if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token || apiKeys.in_username) {
         keyPlatforms.push('in');
       }
 

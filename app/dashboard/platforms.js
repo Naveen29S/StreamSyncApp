@@ -11,6 +11,7 @@ import {
   verifyInstagramOwnership,
   getPhylloSdkToken,
   syncPhylloAccountData,
+  connectLinkedInViaApiKey,
   disconnectPlatform, 
   syncPlatformData, 
   isPlatformMatch, 
@@ -123,6 +124,14 @@ export default function ConnectsScreen() {
   const [igModalError, setIgModalError] = useState('');
   const [igModalSuccess, setIgModalSuccess] = useState('');
 
+  // LinkedIn modal states
+  const [inModalVisible, setInModalVisible] = useState(false);
+  const [inProfile, setInProfile] = useState('');
+  const [inAccessToken, setInAccessToken] = useState('');
+  const [inLoading, setInLoading] = useState(false);
+  const [inModalError, setInModalError] = useState('');
+  const [inModalSuccess, setInModalSuccess] = useState('');
+
   // Handle OAuth redirect errors or status notices
   useEffect(() => {
     let err = params?.error;
@@ -168,6 +177,8 @@ export default function ConnectsScreen() {
         openXModal();
       } else if (params.connect === 'ig') {
         openIgModal();
+      } else if (params.connect === 'in') {
+        openInModal();
       } else {
         const plat = platforms.find(p => p.id === params.connect);
         if (plat) {
@@ -318,6 +329,9 @@ export default function ConnectsScreen() {
     if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
       keyPlatforms.push('ig');
     }
+    if (profileKeys.linkedin || profileKeys.in || profileKeys.in_profile || profileKeys.linkedin_profile || profileKeys.in_token || profileKeys.in_username) {
+      keyPlatforms.push('in');
+    }
 
     const { data: anRows } = await supabase
       .from('analytics')
@@ -367,6 +381,12 @@ export default function ConnectsScreen() {
       if (isIg) {
         setIgUsername(data.api_keys.ig_username || data.api_keys.instagram_username || '');
         setIgAccessToken(data.api_keys.ig || data.api_keys.ig_token || '');
+      }
+
+      const isLinkedIn = platforms.includes('in');
+      if (isLinkedIn) {
+        setInProfile(data.api_keys.in_profile || data.api_keys.in_username || data.api_keys.in_title || '');
+        setInAccessToken(data.api_keys.in || data.api_keys.in_token || '');
       }
     } else {
       setYtApiKey('');
@@ -728,6 +748,85 @@ export default function ConnectsScreen() {
     }
   }
 
+  function openInModal() {
+    setInModalError('');
+    setInModalSuccess('');
+    const rawProfile = apiKeys.in_profile || apiKeys.in_username || apiKeys.in_title || '';
+    const rawToken = apiKeys.in || apiKeys.in_token || '';
+    setInProfile(rawProfile);
+    setInAccessToken(rawToken);
+    setInModalVisible(true);
+  }
+
+  async function handleLinkedInConnect(customToken, customProfile) {
+    const tokenToUse = (customToken !== undefined ? customToken : inAccessToken).trim();
+    const profileToUse = (customProfile !== undefined ? customProfile : inProfile).trim();
+
+    if (!profileToUse && !tokenToUse) {
+      setInModalError('Please enter your LinkedIn profile handle or Access Token.');
+      return;
+    }
+
+    setInLoading(true);
+    setInModalError('');
+    setInModalSuccess('');
+
+    try {
+      const data = await connectLinkedInViaApiKey(profileToUse, tokenToUse);
+      const nameToShow = data.channel?.title || profileToUse || 'LinkedIn User';
+      setInModalSuccess(`Successfully connected @${nameToShow}!`);
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        await fetchProfile(currentSession.user.id);
+      }
+      setTimeout(() => {
+        setInModalSuccess('');
+        setInModalVisible(false);
+      }, 1200);
+    } catch (err) {
+      setInModalError(err.message || 'Failed to connect LinkedIn account.');
+    } finally {
+      setInLoading(false);
+    }
+  }
+
+  async function handleSyncInNow() {
+    setInLoading(true);
+    setInModalError('');
+    try {
+      await syncPlatformData(['in']);
+      setInModalSuccess('LinkedIn analytics refreshed successfully!');
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        await fetchProfile(currentSession.user.id);
+      }
+      setTimeout(() => setInModalSuccess(''), 2000);
+    } catch (e) {
+      setInModalError(e.message || 'Sync failed');
+    } finally {
+      setInLoading(false);
+    }
+  }
+
+  async function handleDisconnectIn() {
+    setInLoading(true);
+    try {
+      setConnectedPlatforms(prev => prev.filter(p => !isPlatformMatch(p, 'in')));
+      setInProfile('');
+      setInAccessToken('');
+      await disconnectPlatform('in');
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        await fetchProfile(currentSession.user.id);
+      }
+      setInModalVisible(false);
+    } catch (e) {
+      setInModalError(e.message || 'Failed to disconnect');
+    } finally {
+      setInLoading(false);
+    }
+  }
+
   async function handleApiKeyConnect(customKey, customChannel) {
     const keyToUse = (customKey !== undefined ? customKey : ytApiKey).trim();
     const chanToUse = (customChannel !== undefined ? customChannel : ytChannelId).trim();
@@ -942,6 +1041,10 @@ export default function ConnectsScreen() {
       openIgModal();
       return;
     }
+    if (platformId === 'in') {
+      openInModal();
+      return;
+    }
     handleOAuthConnect(platformId);
   }
 
@@ -949,6 +1052,7 @@ export default function ConnectsScreen() {
   const isTwitchConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'twitch'));
   const isXConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'x'));
   const isIgConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'ig'));
+  const isLinkedInConnected = connectedPlatforms.some(p => isPlatformMatch(p, 'in'));
 
   // Animation values
   const fadeAnim = React.useRef(new Animated.Value(1)).current;
@@ -1010,7 +1114,17 @@ export default function ConnectsScreen() {
                   </View>
                   <View style={styles.platformInfo}>
                     <Text style={[styles.platformName, { color: colors.textPrimary }]}>{platform.name}</Text>
-                    <Text style={[styles.platformDesc, { color: colors.textSecondary }]}>{platform.description}</Text>
+                    <Text style={[styles.platformDesc, { color: colors.textSecondary }]}>
+                      {isConnected && platform.id === 'in' && (apiKeys.in_username || apiKeys.in_profile || apiKeys.in_title)
+                        ? `Connected as @${apiKeys.in_username || apiKeys.in_profile || apiKeys.in_title}`
+                        : isConnected && platform.id === 'ig' && (apiKeys.ig_username || apiKeys.instagram_username)
+                        ? `Connected as @${apiKeys.ig_username || apiKeys.instagram_username}`
+                        : isConnected && platform.id === 'x' && (apiKeys.x_username || apiKeys.twitter_username)
+                        ? `Connected as @${apiKeys.x_username || apiKeys.twitter_username}`
+                        : isConnected && platform.id === 'yt' && (apiKeys.youtube_channel_title || apiKeys.youtube_channel_id)
+                        ? `Connected: ${apiKeys.youtube_channel_title || apiKeys.youtube_channel_id}`
+                        : platform.description}
+                    </Text>
                   </View>
                 </View>
                 
@@ -1026,6 +1140,7 @@ export default function ConnectsScreen() {
                         else if (platform.id === 'twitch') openTwitchModal();
                         else if (platform.id === 'x') openXModal();
                         else if (platform.id === 'ig') openIgModal();
+                        else if (platform.id === 'in') openInModal();
                         else setManagePlatform(platform);
                       }}
                     >
@@ -1774,6 +1889,143 @@ export default function ConnectsScreen() {
                   </View>
                 </View>
               )}
+            </ScrollView>
+
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── LinkedIn Connection Modal ─── */}
+      <Modal
+        visible={inModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setInModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1 }]}>
+            
+            {/* Modal Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Image source={{ uri: 'https://img.icons8.com/color/512/linkedin.png' }} style={{ width: 28, height: 28 }} resizeMode="contain" />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Connect LinkedIn</Text>
+              </View>
+              <TouchableOpacity onPress={() => setInModalVisible(false)} style={[styles.modalCloseBtn, { backgroundColor: colors.badgeBg }]}>
+                <Text style={{ fontSize: 18, color: colors.textSecondary }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ paddingBottom: 20 }}>
+              {isLinkedInConnected && (
+                <View style={[styles.alreadyConnectedBox, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>LinkedIn Connected & Synced</Text>
+                  </View>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+                    Connected as: @{apiKeys.in_username || apiKeys.in_profile || apiKeys.in_title || 'LinkedIn Creator'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                    <TouchableOpacity 
+                      style={[styles.modalSecondaryBtn, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]} 
+                      onPress={handleSyncInNow}
+                      disabled={inLoading}
+                    >
+                      <Text style={[styles.modalSecondaryBtnText, { color: colors.textPrimary }]}>
+                        {inLoading ? 'Syncing...' : '↻ Sync Now'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.modalDangerBtn, { flex: 1, backgroundColor: colors.cardBg }]} 
+                      onPress={handleDisconnectIn}
+                      disabled={inLoading}
+                    >
+                      <Text style={styles.modalDangerBtnText}>Disconnect</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* 1-Click LinkedIn OAuth */}
+              <TouchableOpacity 
+                style={[
+                  styles.googleOAuthBtn, 
+                  { backgroundColor: '#0A66C2', borderColor: '#0A66C2', marginTop: 14 }
+                ]} 
+                onPress={() => handleOAuthConnect('in')}
+                disabled={syncing === 'in'}
+              >
+                <Image 
+                  source={{ uri: 'https://img.icons8.com/color/512/linkedin.png' }} 
+                  style={{ width: 18, height: 18, marginRight: 10 }} 
+                />
+                <Text style={[styles.googleOAuthBtnText, { color: '#ffffff' }]}>
+                  {syncing === 'in' ? "Connecting to LinkedIn..." : "Continue with LinkedIn OIDC"}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 14 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ marginHorizontal: 10, fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  OR CONNECT VIA API KEY / TOKEN
+                </Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN PROFILE OR COMPANY HANDLE *</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                  placeholder="e.g. satyanadella or google"
+                  placeholderTextColor={colors.textSecondary}
+                  value={inProfile}
+                  onChangeText={setInProfile}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LINKEDIN ACCESS TOKEN (API KEY)</Text>
+                <TextInput
+                  style={[styles.modalInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+                  placeholder="e.g. AQX... or OAuth Bearer Token"
+                  placeholderTextColor={colors.textSecondary}
+                  value={inAccessToken}
+                  onChangeText={setInAccessToken}
+                  secureTextEntry={true}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <TouchableOpacity onPress={() => Linking.openURL('https://www.linkedin.com/developers/apps')}>
+                <Text style={{ fontSize: 12, color: '#0A66C2', fontWeight: '600', marginBottom: 12 }}>
+                  Create an API key / app at linkedin.com/developers ↗
+                </Text>
+              </TouchableOpacity>
+
+              {inModalError ? (
+                <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{inModalError}</Text></View>
+              ) : null}
+              {inModalSuccess ? (
+                <View style={styles.successBanner}><Text style={styles.successBannerText}>{inModalSuccess}</Text></View>
+              ) : null}
+
+              <TouchableOpacity 
+                style={[styles.modalPrimaryBtn, { backgroundColor: '#0A66C2', marginTop: 8 }]} 
+                onPress={() => handleLinkedInConnect()}
+                disabled={inLoading}
+              >
+                {inLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.modalPrimaryBtnText}>
+                    {isLinkedInConnected ? 'Update LinkedIn Account' : 'Connect LinkedIn Account'}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </ScrollView>
 
           </View>

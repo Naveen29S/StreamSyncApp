@@ -30,6 +30,7 @@ export default function DashboardIndex() {
   // In-place Platform Connect & Management Modal
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState('YouTube');
+  const [profileApiKeys, setProfileApiKeys] = useState({});
 
   // Handle OAuth redirect errors if they return directly to the dashboard
   useEffect(() => {
@@ -96,6 +97,7 @@ export default function DashboardIndex() {
     }
 
     const apiKeys = profile?.api_keys || {};
+    setProfileApiKeys(apiKeys);
     const keyPlatforms = [];
     if (apiKeys.youtube || apiKeys.yt || apiKeys.youtube_channel_id || apiKeys.youtube_token) {
       keyPlatforms.push('yt');
@@ -112,7 +114,7 @@ export default function DashboardIndex() {
     if (apiKeys.facebook || apiKeys.fb || apiKeys.fb_page || apiKeys.fb_token) {
       keyPlatforms.push('fb');
     }
-    if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token) {
+    if (apiKeys.linkedin || apiKeys.in || apiKeys.in_profile || apiKeys.in_token || apiKeys.in_username) {
       keyPlatforms.push('in');
     }
 
@@ -335,11 +337,17 @@ export default function DashboardIndex() {
           let dotStyle = styles.statusDotOff;
           
           if (isConnected) {
+            const handle = pKey === 'in' ? (profileApiKeys.in_username || profileApiKeys.in_profile || profileApiKeys.in_title)
+              : pKey === 'ig' ? (profileApiKeys.ig_username || profileApiKeys.instagram_username)
+              : pKey === 'x' ? (profileApiKeys.x_username || profileApiKeys.twitter_username)
+              : pKey === 'yt' ? (profileApiKeys.youtube_channel_title || profileApiKeys.youtube_channel_id)
+              : null;
+
             if (hasApiData) {
-              statusText = 'Receiving Data (Live)';
+              statusText = handle ? `@${String(handle).replace(/^@/, '')} (Live)` : 'Receiving Data (Live)';
               dotStyle = styles.statusDotLive;
             } else {
-              statusText = 'Connected (Sync Ready)';
+              statusText = handle ? `@${String(handle).replace(/^@/, '')} (Ready)` : 'Connected (Sync Ready)';
               dotStyle = { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent };
             }
           }
@@ -418,7 +426,7 @@ export default function DashboardIndex() {
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Cross-Platform Content</Text>
         <View style={styles.tabRow}>
-          {['all', 'YouTube', 'Twitch', 'Instagram', 'X'].map((tab) => (
+          {['all', 'YouTube', 'Twitch', 'Instagram', 'LinkedIn', 'X'].map((tab) => (
             <TouchableOpacity 
               key={tab} 
               style={[

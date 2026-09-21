@@ -81,6 +81,12 @@ export default function CommentsScreen() {
       if (profileKeys.x || profileKeys.x_username || profileKeys.twitter_username || profileKeys.twitter || profileKeys.x_bearer_token || xIdentity) {
         keyPlatforms.push('x');
       }
+      if (profileKeys.instagram || profileKeys.ig || profileKeys.ig_username || profileKeys.instagram_username || profileKeys.ig_token) {
+        keyPlatforms.push('ig');
+      }
+      if (profileKeys.linkedin || profileKeys.in || profileKeys.in_profile || profileKeys.linkedin_profile || profileKeys.in_token || profileKeys.in_username) {
+        keyPlatforms.push('in');
+      }
 
       const { data: anRows } = await supabase
         .from('analytics')
@@ -210,6 +216,8 @@ export default function CommentsScreen() {
   const filteredComments = comments.filter(c => {
     if (activeFilter === 'Unread') return c.unread && !resolvedMap[c.id];
     if (activeFilter === 'YouTube') return c.platform === 'YouTube';
+    if (activeFilter === 'Instagram') return c.platform === 'Instagram' || c.platformKey === 'ig';
+    if (activeFilter === 'LinkedIn') return c.platform === 'LinkedIn' || c.platformKey === 'in';
     if (activeFilter === 'Twitch') return c.platform === 'Twitch';
     if (activeFilter === 'X (Twitter)' || activeFilter === 'X') return c.platform.includes('X') || c.platform.includes('Twitter');
     return true;
@@ -236,7 +244,7 @@ export default function CommentsScreen() {
             <Text style={[styles.refreshBtnText, { color: colors.textPrimary }]}>{syncing ? 'Syncing...' : '↻ Refresh'}</Text>
           </TouchableOpacity>
           <View style={[styles.headerFilters, { backgroundColor: colors.badgeBg }]}>
-            {['All', 'Unread', 'YouTube', 'Twitch', 'X (Twitter)'].map(f => (
+            {['All', 'Unread', 'YouTube', 'Instagram', 'LinkedIn', 'Twitch', 'X (Twitter)'].map(f => (
               <TouchableOpacity 
                 key={f}
                 style={[styles.filterBtn, activeFilter === f && [styles.filterBtnActive, { backgroundColor: colors.cardBg }]]}
