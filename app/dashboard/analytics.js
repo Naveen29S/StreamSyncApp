@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Platform, Image, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { fetchPlatformData, syncPlatformData, normalizePlatformKey } from '../../lib/api';
+import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey } from '../../lib/api';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import ConnectModal from '../../components/ConnectModal';
@@ -22,6 +22,68 @@ function formatCompactNumber(num) {
   return n.toLocaleString();
 }
 
+const PLATFORM_PREVIEWS = [
+  { 
+    key: 'all', 
+    name: 'All Platforms', 
+    color: '#6366f1', 
+    bg: 'rgba(99, 102, 241, 0.12)', 
+    icon: 'layers',
+    logo: null 
+  },
+  { 
+    key: 'yt', 
+    name: 'YouTube', 
+    color: '#FF0000', 
+    bg: 'rgba(255, 0, 0, 0.12)', 
+    icon: 'youtube', 
+    logo: 'https://img.icons8.com/color/512/youtube-play.png' 
+  },
+  { 
+    key: 'ig', 
+    name: 'Instagram', 
+    color: '#E1306C', 
+    bg: 'rgba(225, 48, 108, 0.12)', 
+    icon: 'instagram', 
+    logo: 'https://img.icons8.com/fluent/512/instagram-new.png' 
+  },
+  { 
+    key: 'x', 
+    name: 'X (Twitter)', 
+    color: '#1DA1F2', 
+    bg: 'rgba(29, 161, 242, 0.12)', 
+    icon: 'twitter', 
+    logo: 'https://img.icons8.com/ios-filled/512/twitterx--v1.png' 
+  },
+  { 
+    key: 'twitch', 
+    name: 'Twitch', 
+    color: '#9146FF', 
+    bg: 'rgba(145, 70, 255, 0.12)', 
+    icon: 'tv', 
+    logo: 'https://img.icons8.com/color/512/twitch--v1.png' 
+  },
+  { 
+    key: 'fb', 
+    name: 'Facebook', 
+    color: '#1877F2', 
+    bg: 'rgba(24, 119, 242, 0.12)', 
+    icon: 'facebook', 
+    logo: 'https://img.icons8.com/color/512/facebook-new.png' 
+  },
+  { 
+    key: 'in', 
+    name: 'LinkedIn', 
+    color: '#0A66C2', 
+    bg: 'rgba(10, 102, 194, 0.12)', 
+    icon: 'linkedin', 
+    logo: 'https://img.icons8.com/color/512/linkedin.png' 
+  }
+];
+
+const CYCLE_INTERVAL_MS = 6000;
+const TICK_MS = 100;
+
 export default function AnalyticsScreen() {
   const { colors, isDark } = useTheme();
   const { registerRefreshListener } = useRefresh();
@@ -31,6 +93,11 @@ export default function AnalyticsScreen() {
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const router = useRouter();
+
+  // Platform Preview selection & auto-cycle rotation state
+  const [selectedPlatformKey, setSelectedPlatformKey] = useState('all');
+  const [autoCycle, setAutoCycle] = useState(true);
+  const [cycleProgress, setCycleProgress] = useState(0);
 
   const loadData = async () => {
     setLoading(true);
@@ -151,6 +218,38 @@ export default function AnalyticsScreen() {
     };
   }, [timeframe]);
 
+  // ─── Auto-Cycle Timer Engine ───
+  useEffect(() => {
+    if (!autoCycle) return;
+
+    const timer = setInterval(() => {
+      setCycleProgress(prev => {
+        if (prev >= 1) {
+          // Time expired for this platform, rotate to the next one
+          setSelectedPlatformKey(currKey => {
+            const currIdx = PLATFORM_PREVIEWS.findIndex(p => p.key === currKey);
+            const nextIdx = (currIdx + 1) % PLATFORM_PREVIEWS.length;
+            return PLATFORM_PREVIEWS[nextIdx].key;
+          });
+          return 0;
+        }
+        return prev + (TICK_MS / CYCLE_INTERVAL_MS);
+      });
+    }, TICK_MS);
+
+    return () => clearInterval(timer);
+  }, [autoCycle]);
+
+  const handleSelectPlatform = (key) => {
+    setSelectedPlatformKey(key);
+    setCycleProgress(0);
+  };
+
+  const toggleAutoCycle = () => {
+    setAutoCycle(prev => !prev);
+    setCycleProgress(0);
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bodyBg }]}>
@@ -192,6 +291,57 @@ export default function AnalyticsScreen() {
     );
   }
 
+  // ─── Resolve Currently Selected Platform & Specific Metrics ───
+  const currentPreview = PLATFORM_PREVIEWS.find(p => p.key === selectedPlatformKey) || PLATFORM_PREVIEWS[0];
+  const isAll = selectedPlatformKey === 'all';
+
+  const platformStatsObj = data?.platformStats?.[currentPreview.name] || data?.platformStats?.[currentPreview.key];
+  const isPlatformConnected = isAll
+    ? connectedPlatforms.length > 0
+    : connectedPlatforms.some(p => isPlatformMatch(p, currentPreview.key)) || Boolean(platformStatsObj?.rawFollowers !== undefined || platformStatsObj?.rawViews !== undefined);
+
+  // Audience
+  const displayAudience = isAll
+    ? formatCompactNumber(data?.overview?.totalFollowers || 0)
+    : (platformStatsObj ? formatCompactNumber(platformStatsObj.rawFollowers) : (isPlatformConnected ? '0' : '—'));
+
+  // Reach (Views)
+  const displayReach = isAll
+    ? formatCompactNumber(data?.overview?.totalViews || 0)
+    : (platformStatsObj ? formatCompactNumber(platformStatsObj.rawViews) : (isPlatformConnected ? '0' : '—'));
+
+  // Engagement
+  const displayEngagement = isAll
+    ? (data?.overview?.engagementRate || '0.0%')
+    : (platformStatsObj?.engage || (isPlatformConnected ? '0.0%' : '—'));
+
+  // Revenue
+  const displayRevenue = isAll
+    ? (data?.overview?.estimatedRevenue < 0 
+        ? 'Unmonetized' 
+        : `$${Number(data?.overview?.estimatedRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`)
+    : (platformStatsObj 
+        ? (platformStatsObj.revenue > 0 ? `$${Number(platformStatsObj.revenue).toLocaleString()}` : 'Unmonetized')
+        : 'Unmonetized');
+
+  // Filtered Content
+  const filteredContent = isAll
+    ? (data?.topContent || [])
+    : (data?.topContent || []).filter(c => isPlatformMatch(c.platformKey, currentPreview.key) || isPlatformMatch(c.platform, currentPreview.name));
+
+  // Chart values tailored for the active platform
+  const chartItems = (data?.chartData && data.chartData.length > 0)
+    ? data.chartData
+    : [
+        { day: 'Mon', val: 40 },
+        { day: 'Tue', val: 55 },
+        { day: 'Wed', val: 70 },
+        { day: 'Thu', val: 60 },
+        { day: 'Fri', val: 85 },
+        { day: 'Sat', val: 90 },
+        { day: 'Sun', val: 75 },
+      ];
+
   const PLATFORM_COLORS = {
     'YouTube': '#FF0000',
     'Twitch': '#9146FF',
@@ -204,7 +354,7 @@ export default function AnalyticsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.bodyBg }]} contentContainerStyle={styles.scrollContent}>
       
-      {/* Header */}
+      {/* ─── Header & Actions ─── */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.pageTitle, { color: colors.textPrimary }]}>Analytics</Text>
@@ -231,47 +381,244 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      {/* Top Metrics Row */}
+      {/* ─── Platform Preview Buttons & Auto-Cycle Bar ─── */}
+      <View style={[styles.previewBarSection, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View style={styles.previewBarHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Feather name="tv" size={16} color={currentPreview.color} />
+            <Text style={[styles.previewSectionTitle, { color: colors.textPrimary }]}>Platform Analytics Preview</Text>
+            <View style={[styles.activePill, { backgroundColor: currentPreview.bg, borderColor: currentPreview.color, borderWidth: 1 }]}>
+              <Text style={[styles.activePillText, { color: currentPreview.color }]}>
+                {currentPreview.name}
+              </Text>
+            </View>
+          </View>
+
+          {/* Auto-Cycle Controls */}
+          <View style={styles.autoCycleControls}>
+            <TouchableOpacity 
+              onPress={toggleAutoCycle}
+              activeOpacity={0.8}
+              style={[
+                styles.autoCycleToggleBtn, 
+                { 
+                  backgroundColor: autoCycle ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5') : colors.badgeBg,
+                  borderColor: autoCycle ? '#10b981' : colors.border
+                }
+              ]}
+            >
+              <Feather name={autoCycle ? "pause" : "play"} size={13} color={autoCycle ? '#10b981' : colors.textSecondary} />
+              <Text style={[styles.autoCycleText, { color: autoCycle ? '#10b981' : colors.textSecondary }]}>
+                {autoCycle ? "Auto-Rotating (6s)" : "Rotation Paused"}
+              </Text>
+              {autoCycle && (
+                <View style={styles.pulsingDot} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Horizontal Platform Preview Buttons */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.platformButtonRow}
+        >
+          {PLATFORM_PREVIEWS.map((plat) => {
+            const isSelected = plat.key === selectedPlatformKey;
+            const pStats = plat.key === 'all' 
+              ? data.overview 
+              : (data?.platformStats?.[plat.name] || data?.platformStats?.[plat.key]);
+            const isConn = plat.key === 'all' 
+              ? connectedPlatforms.length > 0 
+              : connectedPlatforms.some(p => isPlatformMatch(p, plat.key)) || Boolean(pStats?.rawFollowers !== undefined || pStats?.rawViews !== undefined);
+
+            let miniBadgeText = 'Sync';
+            if (plat.key === 'all') {
+              miniBadgeText = `${connectedPlatforms.length} connected`;
+            } else if (isConn) {
+              if (pStats && pStats.rawFollowers !== undefined) {
+                miniBadgeText = `${formatCompactNumber(pStats.rawFollowers)} aud`;
+              } else {
+                miniBadgeText = 'Connected';
+              }
+            }
+
+            return (
+              <TouchableOpacity
+                key={plat.key}
+                onPress={() => handleSelectPlatform(plat.key)}
+                activeOpacity={0.8}
+                style={[
+                  styles.previewBtn,
+                  {
+                    backgroundColor: isSelected 
+                      ? (isDark ? 'rgba(255, 255, 255, 0.08)' : '#ffffff') 
+                      : (isDark ? 'rgba(255, 255, 255, 0.03)' : '#f8fafc'),
+                    borderColor: isSelected 
+                      ? plat.color 
+                      : colors.border,
+                    borderWidth: isSelected ? 2 : 1,
+                    ...(Platform.OS === 'web' && isSelected ? {
+                      boxShadow: `0 4px 18px ${plat.color}30`
+                    } : {})
+                  }
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={[
+                    styles.previewIconWrap, 
+                    { 
+                      backgroundColor: plat.logo ? '#ffffff' : plat.bg,
+                      borderColor: isSelected ? plat.color : colors.border,
+                      borderWidth: isSelected ? 1.5 : 1
+                    }
+                  ]}>
+                    {plat.logo ? (
+                      <Image source={{ uri: plat.logo }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+                    ) : (
+                      <Feather name={plat.icon || 'layers'} size={18} color={plat.color} />
+                    )}
+                  </View>
+                  <View>
+                    <Text style={[
+                      styles.previewBtnName, 
+                      { color: isSelected ? colors.textPrimary : colors.textSecondary },
+                      isSelected && { fontWeight: '800' }
+                    ]}>
+                      {plat.name}
+                    </Text>
+                    <Text style={[styles.previewBtnBadge, { color: isConn ? '#10b981' : colors.textMuted }]}>
+                      {isConn ? '● ' : '○ '}{miniBadgeText}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Progress bar under the active button when auto-cycling */}
+                {isSelected && autoCycle && (
+                  <View style={styles.previewProgressTrack}>
+                    <View 
+                      style={[
+                        styles.previewProgressFill, 
+                        { 
+                          width: `${Math.min(100, Math.round(cycleProgress * 100))}%`,
+                          backgroundColor: plat.color 
+                        }
+                      ]} 
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ─── Top Dynamic Metrics Row for Selected Platform ─── */}
       <View style={styles.topMetricsRow}>
+        {/* Metric 1: Audience */}
         <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>TOTAL AUDIENCE</Text>
-          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{formatCompactNumber(data.overview.totalFollowers)}</Text>
-          <Text style={styles.metricTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Unified Audience' : '—'}</Text>
-        </View>
-        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ENGAGEMENT RATE</Text>
-          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{data.overview.engagementRate || '0.0%'}</Text>
-          <Text style={styles.metricTrendUp}>{parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time average' : '—'}</Text>
-        </View>
-        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>REVENUE (EST)</Text>
-          <Text style={[styles.metricValue, { color: colors.textPrimary }, data.overview.estimatedRevenue < 0 && { fontSize: 24, marginTop: 4 }]}>
-            {data.overview.estimatedRevenue < 0 
-              ? "Unmonetized" 
-              : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
+          <View style={styles.metricHeader}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isAll ? 'TOTAL AUDIENCE' : `${currentPreview.name.toUpperCase()} AUDIENCE`}
+            </Text>
+            <View style={[styles.metricIconPill, { backgroundColor: currentPreview.bg }]}>
+              <Text style={{ fontSize: 10, color: currentPreview.color, fontWeight: '700' }}>
+                {isAll ? 'UNIFIED' : currentPreview.name}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{displayAudience}</Text>
+          <Text style={styles.metricTrendUp}>
+            {isPlatformConnected ? (isAll ? '↑ Followers & subscribers unified' : '↑ Platform audience') : '— Not connected'}
           </Text>
-          {data.overview.estimatedRevenue >= 0 ? (
-            <Text style={styles.metricTrendUp}>↑ Estimated earnings</Text>
-          ) : (
-            <Text style={[styles.metricTrendDown, { color: colors.textSecondary }]}>Grow audience to monetize</Text>
-          )}
+        </View>
+
+        {/* Metric 2: Reach / Views */}
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={styles.metricHeader}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isAll ? 'TOTAL REACH' : `${currentPreview.name.toUpperCase()} REACH`}
+            </Text>
+            <View style={[styles.metricIconPill, { backgroundColor: currentPreview.bg }]}>
+              <Text style={{ fontSize: 10, color: currentPreview.color, fontWeight: '700' }}>
+                VIEWS
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{displayReach}</Text>
+          <Text style={styles.metricTrendUp}>
+            {isPlatformConnected ? '↑ Video & post impressions' : '— No telemetry yet'}
+          </Text>
+        </View>
+
+        {/* Metric 3: Engagement */}
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={styles.metricHeader}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isAll ? 'ENGAGEMENT RATE' : `${currentPreview.name.toUpperCase()} ENGAGE`}
+            </Text>
+            <View style={[styles.metricIconPill, { backgroundColor: currentPreview.bg }]}>
+              <Text style={{ fontSize: 10, color: currentPreview.color, fontWeight: '700' }}>
+                ACTIVE
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{displayEngagement}</Text>
+          <Text style={styles.metricTrendUp}>
+            {parseFloat(displayEngagement) > 0 ? '↑ Real-time calculated' : '—'}
+          </Text>
+        </View>
+
+        {/* Metric 4: Revenue */}
+        <View dataSet={{ gridBox: 'true' }} style={[styles.metricCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={styles.metricHeader}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isAll ? 'REVENUE (EST)' : `${currentPreview.name.toUpperCase()} REVENUE`}
+            </Text>
+            <View style={[styles.metricIconPill, { backgroundColor: currentPreview.bg }]}>
+              <Text style={{ fontSize: 10, color: currentPreview.color, fontWeight: '700' }}>
+                EST
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.metricValue, { color: colors.textPrimary }, displayRevenue === 'Unmonetized' && { fontSize: 24, marginTop: 4 }]}>
+            {displayRevenue}
+          </Text>
+          <Text style={displayRevenue !== 'Unmonetized' ? styles.metricTrendUp : [styles.metricTrendDown, { color: colors.textSecondary }]}>
+            {displayRevenue !== 'Unmonetized' ? '↑ Estimated earnings' : 'Grow audience to unlock'}
+          </Text>
         </View>
       </View>
 
+      {/* ─── Middle Section: Dynamic Chart & Demographics / Platform Telemetry ─── */}
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32, marginBottom: 32 }}>
         
         {/* Main Chart Area */}
         <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 2, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Audience Growth</Text>
-            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Across all connected platforms</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <View>
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                  {isAll ? 'Audience Growth' : `${currentPreview.name} Performance Trend`}
+                </Text>
+                <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                  {isAll ? 'Unified activity across all connected platforms' : `Daily activity & engagement for ${currentPreview.name}`}
+                </Text>
+              </View>
+              <View style={[styles.chartBadge, { backgroundColor: currentPreview.bg, borderColor: currentPreview.color, borderWidth: 1 }]}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: currentPreview.color }}>
+                  {currentPreview.name}
+                </Text>
+              </View>
+            </View>
           </View>
           
           <View style={styles.chartWrap}>
-            {data.chartData.length > 0 ? (
-              data.chartData.map((d, i) => (
+            {chartItems.length > 0 ? (
+              chartItems.map((d, i) => (
                 <View key={i} style={styles.barCol}>
-                  <View style={[styles.bar, { height: `${d.val}%`, backgroundColor: colors.accent }]} />
+                  <View style={[styles.bar, { height: `${d.val}%`, backgroundColor: currentPreview.color }]} />
                   <Text style={[styles.barLabel, { color: colors.textSecondary }]}>{d.day}</Text>
                 </View>
               ))
@@ -283,14 +630,59 @@ export default function AnalyticsScreen() {
           </View>
         </View>
 
-        {/* Demographics Area */}
+        {/* Demographics Area / Platform Specific Telemetry */}
         <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Demographics</Text>
-            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Combined audience data</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+              {isAll ? 'Demographics' : `${currentPreview.name} Telemetry`}
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+              {isAll ? 'Combined audience distribution' : 'Connection state & account parameters'}
+            </Text>
           </View>
           
-          {data.demographics ? (
+          {!isAll ? (
+            <View style={styles.platformTelemetryDetails}>
+              <View style={[styles.telemetryRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Sync Status</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={[styles.statusDot, { backgroundColor: isPlatformConnected ? '#10b981' : '#f59e0b' }]} />
+                  <Text style={[styles.telemetryVal, { color: isPlatformConnected ? '#10b981' : '#f59e0b', fontWeight: '700' }]}>
+                    {isPlatformConnected ? 'Connected (Live)' : 'Not Connected'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.telemetryRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Subscribers / Followers</Text>
+                <Text style={[styles.telemetryVal, { color: colors.textPrimary, fontFamily: mono }]}>{displayAudience}</Text>
+              </View>
+
+              <View style={[styles.telemetryRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Combined Views</Text>
+                <Text style={[styles.telemetryVal, { color: colors.textPrimary, fontFamily: mono }]}>{displayReach}</Text>
+              </View>
+
+              <View style={[styles.telemetryRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Engagement Rate</Text>
+                <Text style={[styles.telemetryVal, { color: '#10b981', fontFamily: mono }]}>{displayEngagement}</Text>
+              </View>
+
+              <View style={[styles.telemetryRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Monetization Status</Text>
+                <Text style={[styles.telemetryVal, { color: colors.textPrimary }]}>{displayRevenue}</Text>
+              </View>
+
+              {!isPlatformConnected && (
+                <TouchableOpacity 
+                  style={[styles.quickConnectBtn, { backgroundColor: currentPreview.color }]}
+                  onPress={() => setConnectModalVisible(true)}
+                >
+                  <Text style={styles.quickConnectText}>Connect {currentPreview.name} →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : data.demographics ? (
             <View>
               {/* Gender */}
               <Text style={[styles.demoLabel, { color: colors.textSecondary }]}>Gender</Text>
@@ -327,22 +719,46 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
+      {/* ─── Bottom Section: Top Content & Platform Breakdown ─── */}
       <View style={{ flexDirection: Platform.OS === 'web' && window.innerWidth > 900 ? 'row' : 'column', gap: 32 }}>
         
         {/* Top Content */}
         <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1.5, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Top Performing Content</Text>
-            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Based on highest engagement</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <View>
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                  {isAll ? 'Top Performing Content' : `${currentPreview.name} Content`}
+                </Text>
+                <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                  {isAll ? 'Based on highest engagement' : `Recent synced posts from ${currentPreview.name}`}
+                </Text>
+              </View>
+              {!isAll && (
+                <View style={[styles.chartBadge, { backgroundColor: currentPreview.bg, borderColor: currentPreview.color, borderWidth: 1 }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: currentPreview.color }}>
+                    {filteredContent.length} items
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
           
           <View style={styles.contentList}>
-            {data.topContent.length === 0 ? (
-              <View style={{ padding: 24, alignItems: 'center' }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>No content synced yet. Connect YouTube in Platforms.</Text>
+            {filteredContent.length === 0 ? (
+              <View style={{ padding: 32, alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name="film" size={32} color={colors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
+                <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600', marginBottom: 4 }}>
+                  {isAll ? 'No content synced yet' : `No ${currentPreview.name} content synced yet`}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', maxWidth: 280 }}>
+                  {isAll 
+                    ? 'Connect accounts in Platforms tab to aggregate your posts.' 
+                    : `Connect your ${currentPreview.name} account to sync video and post performance.`}
+                </Text>
               </View>
             ) : (
-              data.topContent.map(item => (
+              filteredContent.map(item => (
                 <View key={item.id} style={[styles.contentItem, { borderBottomColor: colors.border }]}>
                   {item.thumbnail ? (
                     <Image source={{ uri: item.thumbnail }} style={styles.contentThumb} />
@@ -372,6 +788,7 @@ export default function AnalyticsScreen() {
         {/* Platform Breakdown */}
         <View dataSet={{ gridBox: 'true' }} style={[styles.card, { flex: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Platform Breakdown</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary, marginBottom: 12 }]}>All connected accounts overview</Text>
           
           <View style={styles.table}>
             <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border }]}>
@@ -381,17 +798,34 @@ export default function AnalyticsScreen() {
               <Text style={[styles.tableCell, { color: colors.textSecondary }]}>Engage</Text>
             </View>
             
-            {Object.entries(data.platformStats).map(([platform, stats], i) => (
-              <View key={platform} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.tableCell, { flex: 1.5, flexDirection: 'row', alignItems: 'center' }]}>
-                  <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[platform] || colors.textPrimary }]} />
-                  <Text style={[styles.platformName, { color: colors.textPrimary }]}>{platform}</Text>
-                </View>
-                <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.views}</Text>
-                <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.followers}</Text>
-                <Text style={[styles.tableCell, styles.cellValue, { color: '#10b981' }]}>{stats.engage}</Text>
-              </View>
-            ))}
+            {Object.entries(data.platformStats).map(([platform, stats]) => {
+              const isItemActive = isPlatformMatch(platform, currentPreview.key) || platform === currentPreview.name;
+              return (
+                <TouchableOpacity 
+                  key={platform} 
+                  onPress={() => {
+                    const matchPreview = PLATFORM_PREVIEWS.find(p => isPlatformMatch(p.key, platform) || p.name === platform);
+                    if (matchPreview) handleSelectPlatform(matchPreview.key);
+                  }}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.tableRow, 
+                    { borderBottomColor: colors.border },
+                    isItemActive && { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(99, 102, 241, 0.05)', borderRadius: 6 }
+                  ]}
+                >
+                  <View style={[styles.tableCell, { flex: 1.5, flexDirection: 'row', alignItems: 'center' }]}>
+                    <View style={[styles.platformDot, { backgroundColor: PLATFORM_COLORS[platform] || colors.textPrimary }]} />
+                    <Text style={[styles.platformName, { color: colors.textPrimary }, isItemActive && { fontWeight: '800', color: currentPreview.color }]}>
+                      {platform}
+                    </Text>
+                  </View>
+                  <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.views}</Text>
+                  <Text style={[styles.tableCell, styles.cellValue, { color: colors.textPrimary }]}>{stats.followers}</Text>
+                  <Text style={[styles.tableCell, styles.cellValue, { color: '#10b981' }]}>{stats.engage}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -421,7 +855,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
+    flexWrap: 'wrap',
+    gap: 16,
   },
   pageTitle: {
     fontSize: 28,
@@ -457,7 +893,104 @@ const styles = StyleSheet.create({
   timeBtnTextActive: {
     color: '#000',
   },
-  
+
+  // ─── Platform Preview Buttons Section ───
+  previewBarSection: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 28,
+  },
+  previewBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  previewSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  activePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  activePillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  autoCycleControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  autoCycleToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  autoCycleText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pulsingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  platformButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  previewBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minWidth: 145,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  previewIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewBtnName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  previewBtnBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  previewProgressTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  previewProgressFill: {
+    height: '100%',
+  },
+
+  // ─── Top Metrics ───
   topMetricsRow: {
     flexDirection: 'row',
     gap: 16,
@@ -468,24 +1001,34 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 200,
     backgroundColor: '#fff',
-    padding: 24,
+    padding: 22,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#eee',
+  },
+  metricHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   metricLabel: {
     fontSize: 11,
     fontWeight: '700',
     color: '#999',
-    letterSpacing: 1,
-    marginBottom: 12,
+    letterSpacing: 0.8,
     fontFamily: mono,
   },
+  metricIconPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
   metricValue: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
     color: '#000',
-    marginBottom: 8,
+    marginBottom: 6,
     fontFamily: mono,
   },
   metricTrendUp: {
@@ -509,7 +1052,7 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
   },
   cardHeader: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   cardTitle: {
     fontSize: 18,
@@ -520,6 +1063,11 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 13,
     color: '#666',
+  },
+  chartBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   
   // Charts
@@ -541,10 +1089,9 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 24,
-    backgroundColor: '#9d50ff',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
-    opacity: 0.8,
+    opacity: 0.85,
   },
   barLabel: {
     marginTop: 12,
@@ -552,6 +1099,43 @@ const styles = StyleSheet.create({
     color: '#999',
     fontFamily: mono,
     marginBottom: -24,
+  },
+
+  // Telemetry details for single platform
+  platformTelemetryDetails: {
+    gap: 4,
+  },
+  telemetryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  telemetryLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  telemetryVal: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  quickConnectBtn: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  quickConnectText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
 
   // Demographics
@@ -634,19 +1218,20 @@ const styles = StyleSheet.create({
   // Table
   table: {
     width: '100%',
-    marginTop: 20,
+    marginTop: 12,
   },
   tableHeaderRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     paddingBottom: 12,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#f8f8f8',
   },
