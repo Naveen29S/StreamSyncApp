@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { fetchPlatformData, syncPlatformData, isPlatformMatch, normalizePlatformKey, normalizePlatformName, processSessionOAuthTokens } from '../../lib/api';
 import ConnectModal from '../../components/ConnectModal';
+import ThreeDStatsRow from '../../components/ThreeDStatsRow';
 import { useTheme } from '../../context/ThemeContext';
 import { useRefresh } from '../../context/RefreshContext';
 
@@ -308,54 +309,13 @@ export default function DashboardIndex() {
         )}
       </View>
 
-      {/* ─── Aggregated Stats Row ─── */}
-      <View style={styles.statsRow}>
-        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <View style={styles.statHeader}>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Reach</Text>
-            <Text style={styles.statTrendUp}>{data.overview.totalViews > 0 ? '↑ Live' : '—'}</Text>
-          </View>
-          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.totalViews.toLocaleString()}</Text>
-          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Combined views across all platforms</Text>
-        </View>
-
-        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <View style={styles.statHeader}>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Audience</Text>
-            <Text style={styles.statTrendUp}>{data.overview.totalFollowers > 0 ? '↑ Active' : '—'}</Text>
-          </View>
-          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.totalFollowers.toLocaleString()}</Text>
-          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Followers & subscribers unified</Text>
-        </View>
-
-        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <View style={styles.statHeader}>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Engagement</Text>
-            <Text style={styles.statTrendUp}>
-              {parseFloat(data.overview.engagementRate || 0) > 0 ? '↑ Real-time' : '—'}
-            </Text>
-          </View>
-          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.overview.engagementRate || '0.0%'}</Text>
-          <Text style={[styles.statCaption, { color: colors.textMuted }]}>Average across connected platforms</Text>
-        </View>
-
-        <View dataSet={{ gridBox: 'true' }} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <View style={styles.statHeader}>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Revenue</Text>
-            {data.overview.estimatedRevenue >= 0 && (
-              <Text style={styles.statTrendUp}>↑ Est.</Text>
-            )}
-          </View>
-          <Text style={[styles.statValue, { color: colors.textPrimary }]}>
-            {data.overview.estimatedRevenue < 0 
-              ? "Unmonetized" 
-              : `$${data.overview.estimatedRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          </Text>
-          <Text style={[styles.statCaption, { color: colors.textMuted }]}>
-            {data.overview.estimatedRevenue < 0 ? "Grow audience to unlock" : "Monthly creator revenue run-rate"}
-          </Text>
-        </View>
-      </View>
+      {/* ─── 3D Futuristic Telemetry Prism Stats Row ─── */}
+      <ThreeDStatsRow 
+        data={data} 
+        connectedPlatforms={connectedPlatforms} 
+        colors={colors} 
+        isDark={isDark} 
+      />
 
       {/* ─── Platform Breakdown Cards ─── */}
       <View style={styles.sectionHeader}>

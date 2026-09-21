@@ -1,0 +1,406 @@
+import React, { useState, useMemo } from 'react';
+import { StyleSheet, View, Text, Platform, TouchableOpacity } from 'react-native';
+import ThreeDStatCard from './ThreeDStatCard';
+import { normalizePlatformKey, normalizePlatformName } from '../lib/api';
+
+const PLATFORM_META = {
+  all: {
+    name: 'All Platforms',
+    color: '#6366f1',
+    bg: 'rgba(99, 102, 241, 0.15)',
+    captionReach: 'Combined views across platforms',
+    captionAudience: 'Followers & subscribers unified',
+    captionEngage: 'Average across platforms',
+    captionRevenue: 'Monthly creator revenue run-rate',
+  },
+  yt: {
+    name: 'YouTube',
+    color: '#FF0000',
+    bg: 'rgba(255, 0, 0, 0.15)',
+    captionReach: 'Channel lifetime views',
+    captionAudience: 'Subscribers',
+    captionEngage: 'Upload engagement rate',
+    captionRevenue: 'Estimated AdSense revenue',
+  },
+  ig: {
+    name: 'Instagram',
+    color: '#E1306C',
+    bg: 'rgba(225, 48, 108, 0.15)',
+    captionReach: 'Reel & story impressions',
+    captionAudience: 'Profile followers',
+    captionEngage: 'Likes, comments & shares',
+    captionRevenue: 'Brand partnership rate',
+  },
+  x: {
+    name: 'X (Twitter)',
+    color: '#38bdf8',
+    bg: 'rgba(56, 189, 248, 0.15)',
+    captionReach: 'Total post impressions',
+    captionAudience: 'X followers',
+    captionEngage: 'Replies, quotes & reposts',
+    captionRevenue: 'X Ads revenue share',
+  },
+  twitch: {
+    name: 'Twitch',
+    color: '#9146FF',
+    bg: 'rgba(145, 70, 255, 0.15)',
+    captionReach: 'Broadcast & VOD views',
+    captionAudience: 'Channel followers',
+    captionEngage: 'Chat & clip interaction',
+    captionRevenue: 'Subscriptions & bits',
+  },
+  fb: {
+    name: 'Facebook',
+    color: '#1877F2',
+    bg: 'rgba(24, 119, 242, 0.15)',
+    captionReach: 'Page & post impressions',
+    captionAudience: 'Page followers & likes',
+    captionEngage: 'Reactions & comments',
+    captionRevenue: 'Facebook Stars & In-stream',
+  },
+  in: {
+    name: 'LinkedIn',
+    color: '#0A66C2',
+    bg: 'rgba(10, 102, 194, 0.15)',
+    captionReach: 'Post & article impressions',
+    captionAudience: 'Connections & followers',
+    captionEngage: 'Reactions & reposts',
+    captionRevenue: 'Creator consulting value',
+  },
+};
+
+/**
+ * ThreeDStatsRow
+ * Houses the 4 upward-flipping 3D prism cards in the first row of the dashboard.
+ * Dynamically builds surfaces corresponding to all live connected platforms plus unified overview.
+ */
+export default function ThreeDStatsRow({
+  data = {},
+  connectedPlatforms = [],
+  colors = {},
+  isDark = true,
+  intervalMs = 4500,
+}) {
+  const [isAutoRotate, setIsAutoRotate] = useState(true);
+  const [activePlatformIndex, setActivePlatformIndex] = useState(0);
+
+  // Determine active platforms
+  const activeKeys = useMemo(() => {
+    const list = Array.isArray(connectedPlatforms) ? connectedPlatforms.map(p => normalizePlatformKey(p)).filter(Boolean) : [];
+    
+    // Also include any platforms present in data.platformStats
+    if (data?.platformStats) {
+      Object.keys(data.platformStats).forEach(k => {
+        const norm = normalizePlatformKey(k);
+        if (norm && !list.includes(norm) && ['yt', 'ig', 'x', 'twitch', 'fb', 'in'].includes(norm)) {
+          list.push(norm);
+        }
+      });
+    }
+
+    // If no platforms connected yet, provide default major platforms for a full 3D prism experience
+    if (list.length === 0) {
+      return ['yt', 'ig', 'x'];
+    }
+
+    return Array.from(new Set(list));
+  }, [connectedPlatforms, data?.platformStats]);
+
+  // Build the 4 surface decks for each of the 4 cards
+  const { reachSurfaces, audienceSurfaces, engagementSurfaces, revenueSurfaces } = useMemo(() => {
+    const reach = [];
+    const audience = [];
+    const engagement = [];
+    const revenue = [];
+
+    // Surface 0: Unified / All Platforms
+    const unifiedMeta = PLATFORM_META.all;
+    const totalViews = data?.overview?.totalViews || 0;
+    const totalFollowers = data?.overview?.totalFollowers || 0;
+    const engagementRate = data?.overview?.engagementRate || '0.0%';
+    const estimatedRev = data?.overview?.estimatedRevenue ?? 0;
+
+    reach.push({
+      platformName: unifiedMeta.name,
+      platformKey: 'all',
+      brandColor: unifiedMeta.color,
+      brandBg: unifiedMeta.bg,
+      label: 'Total Reach',
+      value: totalViews.toLocaleString(),
+      caption: unifiedMeta.captionReach,
+      trend: totalViews > 0 ? 'Live' : '—',
+    });
+
+    audience.push({
+      platformName: unifiedMeta.name,
+      platformKey: 'all',
+      brandColor: unifiedMeta.color,
+      brandBg: unifiedMeta.bg,
+      label: 'Audience',
+      value: totalFollowers.toLocaleString(),
+      caption: unifiedMeta.captionAudience,
+      trend: totalFollowers > 0 ? 'Active' : '—',
+    });
+
+    engagement.push({
+      platformName: unifiedMeta.name,
+      platformKey: 'all',
+      brandColor: unifiedMeta.color,
+      brandBg: unifiedMeta.bg,
+      label: 'Engagement',
+      value: engagementRate,
+      caption: unifiedMeta.captionEngage,
+      trend: parseFloat(engagementRate || 0) > 0 ? 'Real-time' : '—',
+    });
+
+    revenue.push({
+      platformName: unifiedMeta.name,
+      platformKey: 'all',
+      brandColor: unifiedMeta.color,
+      brandBg: unifiedMeta.bg,
+      label: 'Revenue',
+      value: estimatedRev < 0 ? 'Unmonetized' : `$${Number(estimatedRev).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      caption: estimatedRev < 0 ? 'Grow audience to unlock' : unifiedMeta.captionRevenue,
+      trend: 'Est.',
+    });
+
+    // Subsequent Surfaces: Each active platform
+    activeKeys.forEach((key) => {
+      const meta = PLATFORM_META[key] || {
+        name: normalizePlatformName(key),
+        color: '#6366f1',
+        bg: 'rgba(99, 102, 241, 0.15)',
+        captionReach: 'Platform views',
+        captionAudience: 'Platform followers',
+        captionEngage: 'Platform engagement',
+        captionRevenue: 'Platform earnings',
+      };
+
+      const pStats = data?.platformStats?.[meta.name] || 
+                     data?.platformStats?.[key] || 
+                     data?.platformStats?.[normalizePlatformName(key)] || {};
+
+      const pViews = pStats.views || (pStats.rawViews ? Number(pStats.rawViews).toLocaleString() : '0');
+      const pFollowers = pStats.followers || (pStats.rawFollowers ? Number(pStats.rawFollowers).toLocaleString() : '0');
+      const pEngage = pStats.engage || (pStats.rawEngage ? Number(pStats.rawEngage).toFixed(1) + '%' : '0.0%');
+      const pRevVal = pStats.revenue;
+      let pRevStr = '$0.00';
+      if (pRevVal > 0) {
+        pRevStr = `$${Number(pRevVal).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      } else if (pRevVal === -1) {
+        pRevStr = 'Unmonetized';
+      }
+
+      reach.push({
+        platformName: meta.name,
+        platformKey: key,
+        brandColor: meta.color,
+        brandBg: meta.bg,
+        label: `${meta.name} Reach`,
+        value: pViews,
+        caption: meta.captionReach,
+        trend: pViews !== '0' ? 'Live' : 'Connected',
+      });
+
+      audience.push({
+        platformName: meta.name,
+        platformKey: key,
+        brandColor: meta.color,
+        brandBg: meta.bg,
+        label: `${meta.name} Audience`,
+        value: pFollowers,
+        caption: meta.captionAudience,
+        trend: pFollowers !== '0' ? 'Active' : 'Connected',
+      });
+
+      engagement.push({
+        platformName: meta.name,
+        platformKey: key,
+        brandColor: meta.color,
+        brandBg: meta.bg,
+        label: `${meta.name} Engagement`,
+        value: pEngage,
+        caption: meta.captionEngage,
+        trend: parseFloat(pEngage || 0) > 0 ? 'Live' : 'Tracked',
+      });
+
+      revenue.push({
+        platformName: meta.name,
+        platformKey: key,
+        brandColor: meta.color,
+        brandBg: meta.bg,
+        label: `${meta.name} Revenue`,
+        value: pRevStr,
+        caption: meta.captionRevenue,
+        trend: 'Est.',
+      });
+    });
+
+    return {
+      reachSurfaces: reach,
+      audienceSurfaces: audience,
+      engagementSurfaces: engagement,
+      revenueSurfaces: revenue,
+    };
+  }, [data, activeKeys]);
+
+  const mono = Platform.OS === 'web' ? 'monospace' : undefined;
+
+  return (
+    <View style={styles.container}>
+      {/* Futuristic HUD Header Controls */}
+      <View style={styles.hudBar}>
+        <View style={styles.hudLeft}>
+          <View style={[styles.pulseBeacon, { backgroundColor: isAutoRotate ? '#10b981' : '#f59e0b' }]} />
+          <Text style={[styles.hudTitle, { color: colors.textPrimary }]}>
+            3D HOLOGRAPHIC PRISM TELEMETRY
+          </Text>
+          <View style={[styles.modeTag, { borderColor: isDark ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.2)' }]}>
+            <Text style={styles.modeTagText}>
+              {reachSurfaces.length} SURFACES // UPWARD ROLL
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.hudRight}>
+          <TouchableOpacity
+            onPress={() => setIsAutoRotate(!isAutoRotate)}
+            style={[
+              styles.ctrlBtn,
+              {
+                backgroundColor: isAutoRotate 
+                  ? (isDark ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)')
+                  : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
+                borderColor: isAutoRotate ? '#6366f1' : colors.border
+              }
+            ]}
+          >
+            <Text style={[styles.ctrlBtnText, { color: isAutoRotate ? '#818cf8' : colors.textSecondary }]}>
+              {isAutoRotate ? '❚❚ AUTO-ROLL ON' : '▶ RESUME AUTO-ROLL'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 3D Model Prism Cards Row (Staggered Wave Animation) */}
+      <View style={styles.cardsRow}>
+        {/* Card 1: Total Reach */}
+        <ThreeDStatCard
+          title="Total Reach"
+          metricType="reach"
+          surfaces={reachSurfaces}
+          staggerDelay={0}
+          intervalMs={intervalMs}
+          isDark={isDark}
+          colors={colors}
+          isAutoRotate={isAutoRotate}
+          onSurfaceChange={setActivePlatformIndex}
+        />
+
+        {/* Card 2: Audience */}
+        <ThreeDStatCard
+          title="Audience"
+          metricType="audience"
+          surfaces={audienceSurfaces}
+          staggerDelay={140}
+          intervalMs={intervalMs}
+          isDark={isDark}
+          colors={colors}
+          isAutoRotate={isAutoRotate}
+        />
+
+        {/* Card 3: Engagement */}
+        <ThreeDStatCard
+          title="Engagement"
+          metricType="engagement"
+          surfaces={engagementSurfaces}
+          staggerDelay={280}
+          intervalMs={intervalMs}
+          isDark={isDark}
+          colors={colors}
+          isAutoRotate={isAutoRotate}
+        />
+
+        {/* Card 4: Revenue */}
+        <ThreeDStatCard
+          title="Revenue"
+          metricType="revenue"
+          surfaces={revenueSurfaces}
+          staggerDelay={420}
+          intervalMs={intervalMs}
+          isDark={isDark}
+          colors={colors}
+          isAutoRotate={isAutoRotate}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 28,
+  },
+  hudBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  hudLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  pulseBeacon: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  hudTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    letterSpacing: 1,
+  },
+  modeTag: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  modeTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#818cf8',
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    letterSpacing: 0.5,
+  },
+  hudRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ctrlBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  ctrlBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+    letterSpacing: 0.5,
+  },
+  cardsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+});
