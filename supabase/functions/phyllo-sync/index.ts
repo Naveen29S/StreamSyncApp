@@ -159,45 +159,23 @@ serve(async (req: Request) => {
 
       let profile = {
         id: accountId,
-        username: `@${requestedUsername}`,
-        title: requestedUsername.charAt(0).toUpperCase() + requestedUsername.slice(1),
-        avatarUrl: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
-        totalFollowers: 284500,
-        totalViews: 1420000,
-        videoCount: 142,
-        engagementRate: 5.4,
-        reels: [
-          {
-            videoId: `ph_reel_1_${Date.now()}`,
-            title: `Behind the Scenes with ${requestedUsername}: Creator workflow & editing breakdown`,
-            views: 94200,
-            likes: 6840,
-            comments: 420,
-            engagement: 7.7,
-            thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
-            publishedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-          },
-          {
-            videoId: `ph_reel_2_${Date.now()}`,
-            title: "Top 5 gear essentials every modern digital creator needs in 2026",
-            views: 64100,
-            likes: 4120,
-            comments: 290,
-            engagement: 6.8,
-            thumbnailUrl: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=800&auto=format&fit=crop&q=80",
-            publishedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-          },
-          {
-            videoId: `ph_reel_3_${Date.now()}`,
-            title: "How we scaled to 250k+ followers with consistent story arcs",
-            views: 48900,
-            likes: 3180,
-            comments: 185,
-            engagement: 6.8,
-            thumbnailUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=80",
-            publishedAt: new Date(Date.now() - 86400000 * 9).toISOString(),
-          }
-        ]
+        username: requestedUsername ? `@${requestedUsername}` : "@creator",
+        title: requestedUsername ? (requestedUsername.charAt(0).toUpperCase() + requestedUsername.slice(1)) : "Instagram Creator",
+        avatarUrl: "",
+        totalFollowers: 0,
+        totalViews: 0,
+        videoCount: 0,
+        engagementRate: 0,
+        reels: [] as Array<{
+          videoId: string;
+          title: string;
+          views: number;
+          likes: number;
+          comments: number;
+          engagement: number;
+          thumbnailUrl: string;
+          publishedAt: string;
+        }>
       };
 
       // If live credentials are provided, fetch from real Phyllo REST APIs
